@@ -1,0 +1,9 @@
+# Binaries
+pi-stream
+
+# Env files
+.env*
+
+# IDE
+.idea/
+.vscode/
