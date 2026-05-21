@@ -3,7 +3,7 @@ set -eu
 
 REPO="crazy-goat/pi-stream"
 BINARY="pi-stream"
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
 detect_platform() {
     OS="$(uname -s)"
@@ -37,11 +37,8 @@ echo "Downloading ${BINARY} for ${PLATFORM}..."
 curl -sSfL "${URL}" -o "${BINARY}"
 chmod +x "${BINARY}"
 
-if [ -w "${INSTALL_DIR}" ]; then
-    mv "${BINARY}" "${INSTALL_DIR}/${BINARY}"
-else
-    sudo mv "${BINARY}" "${INSTALL_DIR}/${BINARY}"
-fi
+mkdir -p "${INSTALL_DIR}"
+mv "${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
 echo "Installed ${BINARY} to ${INSTALL_DIR}/${BINARY}"
 "${INSTALL_DIR}/${BINARY}" --version

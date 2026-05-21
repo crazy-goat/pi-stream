@@ -23,10 +23,10 @@ event stream from pi's stdout as styled terminal output:
 curl -sSfL https://raw.githubusercontent.com/crazy-goat/pi-stream/main/install.sh | sh
 ```
 
-To install to a custom directory:
+To install to a custom directory (default is `~/.local/bin`):
 
 ```sh
-INSTALL_DIR=~/.local/bin curl -sSfL https://raw.githubusercontent.com/crazy-goat/pi-stream/main/install.sh | sh
+INSTALL_DIR=/usr/local/bin curl -sSfL https://raw.githubusercontent.com/crazy-goat/pi-stream/main/install.sh | sh
 ```
 
 **From source:**
