@@ -5,12 +5,6 @@ run:
   issues-exit-code: 1
   tests: true
 
-output:
-  formats:
-    colored-line-number:
-      print-issued-lines: true
-      print-linter-name: true
-
 linters:
   default: none
   enable:
@@ -32,6 +26,5 @@ formatters:
     - gofmt
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
