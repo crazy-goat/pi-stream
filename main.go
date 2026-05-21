@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -84,7 +85,7 @@ func main() {
 	}
 
 	go func() {
-		io.Copy(os.Stderr, stderr)
+		_, _ = io.Copy(os.Stderr, stderr)
 	}()
 
 	// Send prompt
@@ -101,30 +102,11 @@ func main() {
 
 	st := idle
 	bol := true // at beginning of line
-	prevEnd := byte(0) // last byte of previous output, for space insertion
 
 	// Print s to stdout, track line position
 	emit := func(s string) {
 		fmt.Print(s)
 		bol = strings.HasSuffix(s, "\n")
-		if len(s) > 0 {
-			prevEnd = s[len(s)-1]
-		}
-	}
-
-	// Add a space between tokens that don't include it themselves
-	needSpace := func(nextStart byte) bool {
-		if prevEnd == 0 {
-			return false
-		}
-		// Already has whitespace on either side
-		if prevEnd == ' ' || prevEnd == '\n' || prevEnd == '\t' {
-			return false
-		}
-		if nextStart == ' ' || nextStart == '\n' || nextStart == '\t' || nextStart == 0 {
-			return false
-		}
-		return true
 	}
 
 	// Ensure we start on a new line if we're mid-line
@@ -132,6 +114,15 @@ func main() {
 		if !bol {
 			emit("\n")
 		}
+	}
+
+	// JSON without HTML-escaping (&, <, > stay as-is)
+	marshalJSON := func(v interface{}) string {
+		var buf bytes.Buffer
+		enc := json.NewEncoder(&buf)
+		enc.SetEscapeHTML(false)
+		_ = enc.Encode(v)
+		return strings.TrimRight(buf.String(), "\n")
 	}
 
 	for scanner.Scan() {
@@ -148,7 +139,7 @@ func main() {
 			if !success {
 				errMsg, _ := event["error"].(string)
 				fmt.Fprintf(os.Stderr, "pi error: %s\n", errMsg)
-				cmd.Process.Kill()
+				_ = cmd.Process.Kill()
 				os.Exit(1)
 			}
 
@@ -173,14 +164,7 @@ func main() {
 					ensureNewline()
 				}
 				st = think
-				if len(delta) > 0 && needSpace(delta[0]) {
-					fmt.Print(" ")
-					prevEnd = ' '
-				}
 				fmt.Printf("\033[2;3m%s\033[0m", delta)
-				if len(delta) > 0 {
-					prevEnd = delta[len(delta)-1]
-				}
 				bol = false
 
 			// ── Text ──
@@ -196,17 +180,11 @@ func main() {
 					ensureNewline()
 				}
 				st = text
-				if len(delta) > 0 && needSpace(delta[0]) {
-					emit(" ")
-				}
 				emit(delta)
 
 			// ── Tool call (LLM decides to use a tool) ──
 			case "toolcall_start":
 				ensureNewline()
-				tc, _ := msgEvent["toolCall"].(map[string]interface{})
-				name, _ := tc["name"].(string)
-				fmt.Printf("\033[1;34m🔧 %s\033[0m\n", name)
 				st = tool
 				bol = true
 
@@ -215,13 +193,14 @@ func main() {
 
 			case "toolcall_end":
 				tc, _ := msgEvent["toolCall"].(map[string]interface{})
+				name, _ := tc["name"].(string)
 				args, _ := tc["arguments"].(map[string]interface{})
 				if len(args) > 0 {
-					argsJSON, _ := json.Marshal(args)
-					// Use dim args on next line
-					fmt.Printf("\033[2m  %s\033[0m\n", string(argsJSON))
-					bol = true
+					fmt.Printf("\033[1;34m🔧 %s %s\033[0m\n", name, marshalJSON(args))
+				} else {
+					fmt.Printf("\033[1;34m🔧 %s\033[0m\n", name)
 				}
+				bol = true
 				st = tool
 			}
 
@@ -229,8 +208,11 @@ func main() {
 		case "tool_execution_start":
 			toolName, _ := event["toolName"].(string)
 			args, _ := event["args"].(map[string]interface{})
-			argsJSON, _ := json.Marshal(args)
-			fmt.Printf("\033[1;33m⚡ %s %s\033[0m\n", toolName, string(argsJSON))
+			if cmd, ok := args["command"].(string); ok {
+				fmt.Printf("\033[1;33m⚡ %s: %s\033[0m\n", toolName, cmd)
+			} else {
+				fmt.Printf("\033[1;33m⚡ %s %s\033[0m\n", toolName, marshalJSON(args))
+			}
 			st = tool
 			bol = true
 
@@ -273,7 +255,7 @@ func main() {
 		case "agent_end":
 			ensureNewline()
 			stdin.Close()
-			cmd.Wait()
+			_ = cmd.Wait()
 			os.Exit(0)
 
 		case "error":
@@ -285,7 +267,7 @@ func main() {
 				errMsg, _ = event["error"].(string)
 			}
 			fmt.Fprintf(os.Stderr, "pi error: %s\n", errMsg)
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 			os.Exit(1)
 		}
 	}
@@ -296,6 +278,6 @@ func main() {
 	}
 
 	stdin.Close()
-	cmd.Wait()
+	_ = cmd.Wait()
 	os.Exit(0)
 }
