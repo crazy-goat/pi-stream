@@ -85,7 +85,7 @@ func main() {
 	}
 
 	go func() {
-		io.Copy(os.Stderr, stderr)
+		_, _ = io.Copy(os.Stderr, stderr)
 	}()
 
 	// Send prompt
@@ -121,7 +121,7 @@ func main() {
 		var buf bytes.Buffer
 		enc := json.NewEncoder(&buf)
 		enc.SetEscapeHTML(false)
-		enc.Encode(v)
+		_ = enc.Encode(v)
 		return strings.TrimRight(buf.String(), "\n")
 	}
 
@@ -139,7 +139,7 @@ func main() {
 			if !success {
 				errMsg, _ := event["error"].(string)
 				fmt.Fprintf(os.Stderr, "pi error: %s\n", errMsg)
-				cmd.Process.Kill()
+				_ = cmd.Process.Kill()
 				os.Exit(1)
 			}
 
@@ -255,7 +255,7 @@ func main() {
 		case "agent_end":
 			ensureNewline()
 			stdin.Close()
-			cmd.Wait()
+			_ = cmd.Wait()
 			os.Exit(0)
 
 		case "error":
@@ -267,7 +267,7 @@ func main() {
 				errMsg, _ = event["error"].(string)
 			}
 			fmt.Fprintf(os.Stderr, "pi error: %s\n", errMsg)
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 			os.Exit(1)
 		}
 	}
@@ -278,6 +278,6 @@ func main() {
 	}
 
 	stdin.Close()
-	cmd.Wait()
+	_ = cmd.Wait()
 	os.Exit(0)
 }
