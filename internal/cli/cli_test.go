@@ -71,16 +71,61 @@ func TestHandleEventToolExecEndRenders(t *testing.T) {
 	var out bytes.Buffer
 	r := render.New(&out)
 	_, _ = handleEvent(r, event.Envelope{
-		Type:     "tool_execution_end",
-		ToolName: "bash",
-		IsError:  false,
+		Type:       "tool_execution_start",
+		ToolCallID: "call-1",
+		ToolName:   "bash",
+		Args:       map[string]any{"command": "x"},
+	}, &bytes.Buffer{})
+	_, _ = handleEvent(r, event.Envelope{
+		Type:       "tool_execution_end",
+		ToolCallID: "call-1",
+		ToolName:   "bash",
+		IsError:    false,
 		Result: &event.Result{Content: []event.ResultContent{
 			{Text: "ok"},
 		}},
 	}, &bytes.Buffer{})
-	if got := out.String(); !strings.Contains(got, "✓ bash → ok") {
-		t.Errorf("expected ✓ summary, got %q", got)
+	got := stripANSI(out.String())
+	if !strings.Contains(got, "│ ok") {
+		t.Errorf("expected output line in box, got %q", got)
 	}
+	if !strings.Contains(got, "✓ bash") {
+		t.Errorf("expected ✓ bash footer, got %q", got)
+	}
+}
+
+func TestHandleEventToolExecUpdateStreamsLines(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	r := render.New(&out)
+	r.ToolExecStart("call-1", "bash", map[string]any{"command": "seq 1 2"})
+	_, _ = handleEvent(r, event.Envelope{
+		Type:       "tool_execution_update",
+		ToolCallID: "call-1",
+		ToolName:   "bash",
+		PartialResult: &event.Result{Content: []event.ResultContent{
+			{Text: "line 1\n"},
+		}},
+	}, &bytes.Buffer{})
+	got := stripANSI(out.String())
+	if !strings.Contains(got, "│ line 1") {
+		t.Errorf("expected streamed line, got %q", got)
+	}
+}
+
+func stripANSI(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '[' {
+			i += 2
+			for i < len(s) && s[i] >= 0x20 && s[i] < 0x40 {
+				i++
+			}
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
 }
 
 func TestHandleMessageThinkingDelta(t *testing.T) {
@@ -93,7 +138,7 @@ func TestHandleMessageThinkingDelta(t *testing.T) {
 	}
 }
 
-func TestHandleMessageToolCallEndRendersName(t *testing.T) {
+func TestHandleMessageToolCallEndIsNoOp(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
 	r := render.New(&out)
@@ -101,18 +146,7 @@ func TestHandleMessageToolCallEndRendersName(t *testing.T) {
 		Type:     "toolcall_end",
 		ToolCall: &event.ToolCall{Name: "bash", Arguments: map[string]any{"command": "ls"}},
 	})
-	got := out.String()
-	if !strings.Contains(got, "🔧 bash") {
-		t.Errorf("expected 🔧 bash, got %q", got)
-	}
-}
-
-func TestHandleMessageToolCallEndWithoutToolCallIsNoOp(t *testing.T) {
-	t.Parallel()
-	var out bytes.Buffer
-	r := render.New(&out)
-	handleMessage(r, &event.AssistantMessageEvent{Type: "toolcall_end", ToolCall: nil})
 	if out.String() != "" {
-		t.Errorf("expected no output, got %q", out.String())
+		t.Errorf("toolcall_end should not render — box comes from tool_execution_*; got %q", out.String())
 	}
 }

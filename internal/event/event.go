@@ -18,10 +18,12 @@ type Envelope struct {
 	AssistantMessageEvent *AssistantMessageEvent `json:"assistantMessageEvent,omitempty"`
 
 	// Populated for type=="tool_execution_*".
-	ToolName string         `json:"toolName,omitempty"`
-	Args     map[string]any `json:"args,omitempty"`
-	IsError  bool           `json:"isError,omitempty"`
-	Result   *Result        `json:"result,omitempty"`
+	ToolCallID    string         `json:"toolCallId,omitempty"`
+	ToolName      string         `json:"toolName,omitempty"`
+	Args          map[string]any `json:"args,omitempty"`
+	IsError       bool           `json:"isError,omitempty"`
+	Result        *Result        `json:"result,omitempty"`
+	PartialResult *Result        `json:"partialResult,omitempty"`
 }
 
 // AssistantMessageEvent describes a single token-level event emitted by the
