@@ -17,6 +17,20 @@ event stream from pi's stdout as styled terminal output:
 
 ## Install
 
+**One-liner** (Linux and macOS, detects OS/arch automatically):
+
+```sh
+curl -sSfL https://raw.githubusercontent.com/crazy-goat/pi-stream/main/install.sh | sh
+```
+
+To install to a custom directory:
+
+```sh
+INSTALL_DIR=~/.local/bin curl -sSfL https://raw.githubusercontent.com/crazy-goat/pi-stream/main/install.sh | sh
+```
+
+**From source:**
+
 ```sh
 make install        # builds and copies pi-stream into ~/.local/bin
 # or

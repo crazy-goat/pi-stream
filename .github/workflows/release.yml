@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.23'
+  BINARY: pi-stream
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build cross-platform binaries
+        run: |
+          VERSION="${GITHUB_SHA::7}"
+          LDFLAGS="-s -w -X github.com/crazy-goat/pi-stream/internal/cli.Version=${VERSION}"
+
+          declare -a TARGETS=(
+            "linux/amd64"
+            "linux/arm64"
+            "darwin/amd64"
+            "darwin/arm64"
+          )
+
+          mkdir -p dist
+          for TARGET in "${TARGETS[@]}"; do
+            OS="${TARGET%%/*}"
+            ARCH="${TARGET##*/}"
+            OUT="dist/${BINARY}-${OS}-${ARCH}"
+            echo "Building ${OUT}..."
+            GOOS="${OS}" GOARCH="${ARCH}" go build \
+              -ldflags="${LDFLAGS}" \
+              -o "${OUT}" .
+          done
+
+          ls -lh dist/
+
+      - name: Checksum
+        working-directory: dist
+        run: sha256sum * > checksums.txt && cat checksums.txt
+
+      - name: Delete existing latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes 2>/dev/null || true
+          git push --delete origin latest 2>/dev/null || true
+
+      - name: Create latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create latest \
+            --title "Latest build (${GITHUB_SHA::7})" \
+            --notes "Automated release from \`main\` — commit [\`${GITHUB_SHA::7}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})." \
+            --latest \
+            dist/*
