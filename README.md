@@ -6,9 +6,23 @@ from pi's stdout as styled terminal output:
 
 - thinking tokens in dim italic
 - assistant text plain
-- tool calls (`🔧 name args`) when the model decides to invoke a tool
-- tool execution (`⚡ name: cmd`) when the tool actually runs
-- truncated tool result with `✓` / `✗` status
+- tool execution rendered as a box with live, line-by-line streamed output:
+
+  ```
+  ┌─ ⚡ bash ─ seq 1 5 | while read i; do echo line $i; sleep 0.3; done
+  │ line 1
+  │ line 2
+  │ line 3
+  │ line 4
+  │ line 5
+  └─ ✓ bash (1.6s, 5 lines)
+  ```
+
+  The top-corner header opens when the tool starts, each new line of the
+  tool's stdout streams in with a `│` gutter as soon as `pi` emits it, and
+  the bottom corner closes with a green `✓` (success) or red `✗` (error),
+  the elapsed time, and the line count. Full output is preserved — nothing
+  is truncated.
 
 ## Requirements
 

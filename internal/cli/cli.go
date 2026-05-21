@@ -122,11 +122,11 @@ func handleEvent(r *render.Renderer, env event.Envelope, stderr io.Writer) (bool
 			handleMessage(r, env.AssistantMessageEvent)
 		}
 	case "tool_execution_start":
-		r.ToolExecStart(env.ToolName, env.Args)
+		r.ToolExecStart(env.ToolCallID, env.ToolName, env.Args)
 	case "tool_execution_update":
-		// Streaming output; nothing to render today.
+		r.ToolExecUpdate(env.ToolCallID, env.PartialResult.SummaryText())
 	case "tool_execution_end":
-		r.ToolExecEnd(env.ToolName, env.IsError, env.Result.SummaryText())
+		r.ToolExecEnd(env.ToolCallID, env.IsError, env.Result.SummaryText())
 	case "turn_start":
 		r.TurnStart()
 	case "turn_end":
@@ -151,11 +151,8 @@ func handleMessage(r *render.Renderer, msg *event.AssistantMessageEvent) {
 		r.Thinking(msg.Delta)
 	case "text_delta":
 		r.Text(msg.Delta)
-	case "toolcall_end":
-		if msg.ToolCall != nil {
-			r.ToolCall(msg.ToolCall.Name, msg.ToolCall.Arguments)
-		}
-		// thinking_start, text_start, toolcall_start, toolcall_delta:
-		// no-op — renderer handles section transitions on the deltas.
+		// thinking_start, text_start, toolcall_*: no-op. The tool-execution
+		// box (rendered from tool_execution_* events) is enough; rendering
+		// toolcall_end would just duplicate the header.
 	}
 }
