@@ -1,8 +1,8 @@
 # pi-stream
 
-A small streaming proxy for [`pi`](https://github.com/) in RPC mode. It launches
-`pi --mode rpc`, sends a single prompt over its JSON-RPC stdin, and renders the
-event stream from pi's stdout as styled terminal output:
+A small streaming proxy for `pi` in RPC mode. It launches `pi --mode rpc`,
+sends a single prompt over its JSON-RPC stdin, and renders the event stream
+from pi's stdout as styled terminal output:
 
 - thinking tokens in dim italic
 - assistant text plain
@@ -12,29 +12,26 @@ event stream from pi's stdout as styled terminal output:
 
 ## Requirements
 
-- Go 1.23+ to build
-- A working `pi` binary on `$PATH` (this proxy spawns it)
+- A working `pi` binary on `$PATH` (pi-stream spawns it as a subprocess)
 
 ## Install
 
-**One-liner** (Linux and macOS, detects OS/arch automatically):
+**One-liner** — Linux and macOS, detects OS/arch automatically, installs to `~/.local/bin`:
 
 ```sh
 curl -sSfL https://raw.githubusercontent.com/crazy-goat/pi-stream/main/install.sh | sh
 ```
 
-To install to a custom directory (default is `~/.local/bin`):
+Custom install directory:
 
 ```sh
-INSTALL_DIR=/usr/local/bin curl -sSfL https://raw.githubusercontent.com/crazy-goat/pi-stream/main/install.sh | sh
+curl -sSfL https://raw.githubusercontent.com/crazy-goat/pi-stream/main/install.sh | INSTALL_DIR=/usr/local/bin sh
 ```
 
-**From source:**
+**From source** (requires Go 1.23+):
 
 ```sh
-make install        # builds and copies pi-stream into ~/.local/bin
-# or
-go install github.com/crazy-goat/pi-stream@latest
+make install        # builds and copies pi-stream to ~/.local/bin
 ```
 
 ## Usage
@@ -45,13 +42,13 @@ pi-stream [flags] <prompt>
 
 ### Flags
 
-| Flag         | Default | Description                                                  |
-| ------------ | ------- | ------------------------------------------------------------ |
-| `--model`    | (auto)  | Model name forwarded to pi (e.g. `"GLM 5.1"`).               |
-| `--thinking` | `high`  | Thinking level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`. |
-| `-t`         | (none)  | Comma-separated tool allowlist (e.g. `bash,read`).           |
-| `--session`  | (none)  | pi session file path; share between invocations for context. |
-| `--version`  |         | Print version and exit.                                      |
+| Flag         | Default | Description                                                             |
+| ------------ | ------- | ----------------------------------------------------------------------- |
+| `--model`    | (auto)  | Model name forwarded to pi (e.g. `"GLM 5.1"`).                          |
+| `--thinking` | `high`  | Thinking level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`.    |
+| `-t`         | (none)  | Comma-separated tool allowlist (e.g. `bash,read`).                      |
+| `--session`  | (none)  | pi session file path; share between invocations to carry context over.  |
+| `--version`  |         | Print version and exit.                                                 |
 
 ### Examples
 
@@ -69,12 +66,12 @@ pi-stream --session /tmp/sess "follow-up that should remember the first"
 
 ### Exit codes
 
-| Code | Meaning                                            |
-| ---- | -------------------------------------------------- |
-| 0    | Normal completion (`agent_end` received)           |
-| 1    | pi reported an error envelope, or startup failed   |
-| 2    | Invalid CLI flags / missing prompt                 |
-| 130  | Interrupted by `SIGINT` or `SIGTERM` (Ctrl+C)      |
+| Code | Meaning                                          |
+| ---- | ------------------------------------------------ |
+| 0    | Normal completion (`agent_end` received)         |
+| 1    | pi reported an error, or startup failed          |
+| 2    | Invalid CLI flags / missing prompt               |
+| 130  | Interrupted by `SIGINT` or `SIGTERM` (Ctrl+C)   |
 
 ## Development
 
@@ -88,11 +85,11 @@ make tidy         # go mod tidy + diff check
 Layout:
 
 ```
-main.go                       # ~10-line entrypoint
-internal/event/               # typed event structs for pi's JSON stream
-internal/render/              # state-machine Renderer that styles events
-internal/pi/                  # subprocess lifecycle (Start, Events, Close)
-internal/cli/                 # flag parsing + event-loop orchestration
+main.go                  # thin entrypoint — signal handling + os.Exit
+internal/event/          # typed structs for pi's JSON-RPC event stream
+internal/render/         # state-machine Renderer: styles events as ANSI output
+internal/pi/             # subprocess lifecycle (Start, Events, Close)
+internal/cli/            # flag parsing + event-loop orchestration
 ```
 
 ## License
