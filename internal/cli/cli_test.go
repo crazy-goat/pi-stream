@@ -12,12 +12,17 @@ import (
 	"github.com/crazy-goat/pi-stream/internal/testutil"
 )
 
+// testError is a simple error implementation for injecting scanner errors
+// into fakeEventSource.
+type testError struct{ msg string }
+
+func (e testError) Error() string { return e.msg }
+
 // fakeEventSource implements eventSource for testing streamEvents.
 type fakeEventSource struct {
-	ch      chan []byte
-	errCh   chan error
-	killErr error
-	killed  bool
+	ch     chan []byte
+	errCh  chan error
+	killed bool
 }
 
 func newFakeEventSource() *fakeEventSource {
@@ -33,7 +38,7 @@ func (f *fakeEventSource) Events() (<-chan []byte, <-chan error) {
 
 func (f *fakeEventSource) Kill() error {
 	f.killed = true
-	return f.killErr
+	return nil
 }
 
 func TestStreamEventsReturnsOKOnChannelClose(t *testing.T) {
@@ -123,7 +128,7 @@ func TestStreamEventsStopsOnResponseFailure(t *testing.T) {
 func TestStreamEventsStopsOnScannerError(t *testing.T) {
 	t.Parallel()
 	fs := newFakeEventSource()
-	fs.errCh <- assertError{"scanner buffer overflow"}
+	fs.errCh <- testError{"scanner buffer overflow"}
 
 	var stderr bytes.Buffer
 	code := streamEvents(context.Background(), fs, &bytes.Buffer{}, &stderr)
@@ -134,10 +139,6 @@ func TestStreamEventsStopsOnScannerError(t *testing.T) {
 		t.Errorf("stderr missing scanner error: %q", stderr.String())
 	}
 }
-
-type assertError struct{ msg string }
-
-func (e assertError) Error() string { return e.msg }
 
 func TestStreamEventsFullFlow(t *testing.T) {
 	t.Parallel()
@@ -164,6 +165,17 @@ func TestStreamEventsFullFlow(t *testing.T) {
 	}
 	if !strings.Contains(got, "✓ bash") {
 		t.Errorf("stdout missing tool footer: %q", got)
+	}
+}
+
+func TestStreamEventsNilScannerErrorReturnsExitOK(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	fs.errCh <- nil
+
+	code := streamEvents(context.Background(), fs, &bytes.Buffer{}, &bytes.Buffer{})
+	if code != ExitOK {
+		t.Errorf("nil scanner error: code=%d, want %d", code, ExitOK)
 	}
 }
 
