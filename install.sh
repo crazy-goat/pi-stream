@@ -30,15 +30,43 @@ detect_platform() {
     echo "${OS}-${ARCH}"
 }
 
+detect_checksum_cmd() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        echo "sha256sum"
+    elif command -v shasum >/dev/null 2>&1; then
+        echo "shasum -a 256"
+    else
+        echo "no-sha256sum"
+    fi
+}
+
 PLATFORM="$(detect_platform)"
-URL="https://github.com/${REPO}/releases/latest/download/${BINARY}-${PLATFORM}"
+CHECKSUM_CMD="$(detect_checksum_cmd)"
+
+if [ "${CHECKSUM_CMD}" = "no-sha256sum" ]; then
+    echo "Error: no sha256sum or shasum found — cannot verify binary checksum" >&2
+    exit 1
+fi
+
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR}"' EXIT
+
+BINARY_URL="https://github.com/${REPO}/releases/latest/download/${BINARY}-${PLATFORM}"
+CHECKSUM_URL="https://github.com/${REPO}/releases/latest/download/checksums.txt"
 
 echo "Downloading ${BINARY} for ${PLATFORM}..."
-curl -sSfL "${URL}" -o "${BINARY}"
-chmod +x "${BINARY}"
+curl -sSfL "${BINARY_URL}" -o "${TMPDIR}/${BINARY}"
+curl -sSfL "${CHECKSUM_URL}" -o "${TMPDIR}/checksums.txt"
 
+echo "Verifying checksum..."
+grep "${BINARY}-${PLATFORM}" "${TMPDIR}/checksums.txt" | (cd "${TMPDIR}" && ${CHECKSUM_CMD} -c -) 2>/dev/null || {
+    echo "Checksum verification failed! Downloaded binary may be corrupted or tampered with." >&2
+    exit 1
+}
+
+chmod +x "${TMPDIR}/${BINARY}"
 mkdir -p "${INSTALL_DIR}"
-mv "${BINARY}" "${INSTALL_DIR}/${BINARY}"
+mv "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
 echo "Installed ${BINARY} to ${INSTALL_DIR}/${BINARY}"
 "${INSTALL_DIR}/${BINARY}" --version

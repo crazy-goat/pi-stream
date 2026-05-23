@@ -49,7 +49,7 @@ jobs:
 
       - name: Checksum
         working-directory: dist
-        run: sha256sum * > checksums.txt && cat checksums.txt
+        run: shasum -a 256 * > checksums.txt && cat checksums.txt
 
       - name: Delete existing latest release
         env:
