@@ -20,13 +20,17 @@ import (
 // "-X github.com/crazy-goat/pi-stream/internal/cli.Version=...".
 var Version = "dev"
 
-// Exit codes returned by Run.
-const (
-	ExitOK        = 0
-	ExitError     = 1
-	ExitUsage     = 2
-	ExitInterrupt = 130
-)
+// ExitOK indicates normal completion (agent_end received).
+const ExitOK = 0
+
+// ExitError indicates pi reported an error or startup failed.
+const ExitError = 1
+
+// ExitUsage indicates invalid CLI flags or missing prompt.
+const ExitUsage = 2
+
+// ExitInterrupt indicates the process was interrupted by SIGINT or SIGTERM.
+const ExitInterrupt = 130
 
 // validThinking is the set of accepted --thinking flag values.
 var validThinking = map[string]bool{
