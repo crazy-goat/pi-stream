@@ -12,6 +12,184 @@ import (
 	"github.com/crazy-goat/pi-stream/internal/testutil"
 )
 
+// testError is a simple error implementation for injecting scanner errors
+// into fakeEventSource.
+type testError struct{ msg string }
+
+func (e testError) Error() string { return e.msg }
+
+// fakeEventSource implements eventSource for testing streamEvents.
+type fakeEventSource struct {
+	ch     chan []byte
+	errCh  chan error
+	killed bool
+}
+
+func newFakeEventSource() *fakeEventSource {
+	return &fakeEventSource{
+		ch:    make(chan []byte, 32),
+		errCh: make(chan error, 1),
+	}
+}
+
+func (f *fakeEventSource) Events() (<-chan []byte, <-chan error) {
+	return f.ch, f.errCh
+}
+
+func (f *fakeEventSource) Kill() error {
+	f.killed = true
+	return nil
+}
+
+func TestStreamEventsReturnsOKOnChannelClose(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	close(fs.ch)
+
+	code := streamEvents(context.Background(), fs, &bytes.Buffer{}, &bytes.Buffer{})
+	if code != ExitOK {
+		t.Errorf("channel close: code=%d, want %d", code, ExitOK)
+	}
+}
+
+func TestStreamEventsReturnsInterruptOnContextCancel(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	code := streamEvents(ctx, fs, &bytes.Buffer{}, &bytes.Buffer{})
+	if code != ExitInterrupt {
+		t.Errorf("ctx cancel: code=%d, want %d", code, ExitInterrupt)
+	}
+}
+
+func TestStreamEventsSkipsMalformedJSON(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	fs.ch <- []byte("not json")
+	fs.ch <- []byte(`{"type":"agent_end"}`)
+	close(fs.ch)
+
+	code := streamEvents(context.Background(), fs, &bytes.Buffer{}, &bytes.Buffer{})
+	if code != ExitOK {
+		t.Errorf("malformed JSON skipped: code=%d, want %d", code, ExitOK)
+	}
+}
+
+func TestStreamEventsRendersTextDelta(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	fs.ch <- []byte(`{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"hello world"}}`)
+	close(fs.ch)
+
+	var stdout bytes.Buffer
+	code := streamEvents(context.Background(), fs, &stdout, &bytes.Buffer{})
+	if code != ExitOK {
+		t.Errorf("text delta: code=%d, want %d", code, ExitOK)
+	}
+	if !strings.Contains(stdout.String(), "hello world") {
+		t.Errorf("stdout missing text: %q", stdout.String())
+	}
+}
+
+func TestStreamEventsStopsOnErrorEnvelope(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	fs.ch <- []byte(`{"type":"error","error":"something went wrong"}`)
+	close(fs.ch)
+
+	var stderr bytes.Buffer
+	code := streamEvents(context.Background(), fs, &bytes.Buffer{}, &stderr)
+	if code != ExitError {
+		t.Errorf("error envelope: code=%d, want %d", code, ExitError)
+	}
+	if !strings.Contains(stderr.String(), "something went wrong") {
+		t.Errorf("stderr missing error: %q", stderr.String())
+	}
+}
+
+func TestStreamEventsStopsOnResponseFailure(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	fs.ch <- []byte(`{"type":"response","success":false,"error":"permission denied"}`)
+	close(fs.ch)
+
+	var stderr bytes.Buffer
+	code := streamEvents(context.Background(), fs, &bytes.Buffer{}, &stderr)
+	if code != ExitError {
+		t.Errorf("response failure: code=%d, want %d", code, ExitError)
+	}
+	if !strings.Contains(stderr.String(), "permission denied") {
+		t.Errorf("stderr missing error: %q", stderr.String())
+	}
+}
+
+func TestStreamEventsStopsOnScannerError(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	fs.errCh <- testError{"scanner buffer overflow"}
+
+	var stderr bytes.Buffer
+	code := streamEvents(context.Background(), fs, &bytes.Buffer{}, &stderr)
+	if code != ExitError {
+		t.Errorf("scanner error: code=%d, want %d", code, ExitError)
+	}
+	if !strings.Contains(stderr.String(), "scanner buffer overflow") {
+		t.Errorf("stderr missing scanner error: %q", stderr.String())
+	}
+}
+
+func TestStreamEventsFullFlow(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	fs.ch <- []byte(`{"type":"message_update","assistantMessageEvent":{"type":"thinking_delta","delta":"thinking..."}}`)
+	fs.ch <- []byte(`{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"hello"}}`)
+	fs.ch <- []byte(`{"type":"tool_execution_start","toolCallId":"call-1","toolName":"bash","args":{"command":"echo hi"}}`)
+	fs.ch <- []byte(`{"type":"tool_execution_update","toolCallId":"call-1","partialResult":{"content":[{"text":"hi\n"}]}}`)
+	fs.ch <- []byte(`{"type":"tool_execution_end","toolCallId":"call-1","result":{"content":[{"text":"done"}]}}`)
+	fs.ch <- []byte(`{"type":"agent_end"}`)
+	close(fs.ch)
+
+	var stdout bytes.Buffer
+	code := streamEvents(context.Background(), fs, &stdout, &bytes.Buffer{})
+	if code != ExitOK {
+		t.Errorf("full flow: code=%d, want %d", code, ExitOK)
+	}
+	got := testutil.StripANSI(stdout.String())
+	if !strings.Contains(got, "hello") {
+		t.Errorf("stdout missing text: %q", got)
+	}
+	if !strings.Contains(got, "thinking...") {
+		t.Errorf("stdout missing thinking: %q", got)
+	}
+	if !strings.Contains(got, "✓ bash") {
+		t.Errorf("stdout missing tool footer: %q", got)
+	}
+}
+
+func TestStreamEventsNilScannerErrorReturnsExitOK(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	fs.errCh <- nil
+
+	code := streamEvents(context.Background(), fs, &bytes.Buffer{}, &bytes.Buffer{})
+	if code != ExitOK {
+		t.Errorf("nil scanner error: code=%d, want %d", code, ExitOK)
+	}
+}
+
+func TestStreamEventsInterruptKillsProcess(t *testing.T) {
+	t.Parallel()
+	fs := newFakeEventSource()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_ = streamEvents(ctx, fs, &bytes.Buffer{}, &bytes.Buffer{})
+	if !fs.killed {
+		t.Error("Kill() was not called on context cancel")
+	}
+}
+
 func TestHandleEventAgentEndStopsAndSucceeds(t *testing.T) {
 	t.Parallel()
 	r := render.New(&bytes.Buffer{})

@@ -93,9 +93,16 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	return exit
 }
 
+// eventSource is the subset of pi.Process that streamEvents needs,
+// extracted as an interface for testability.
+type eventSource interface {
+	Events() (<-chan []byte, <-chan error)
+	Kill() error
+}
+
 // streamEvents drains the process event channel until completion, an
 // error envelope, a scanner error, or context cancellation.
-func streamEvents(ctx context.Context, proc *pi.Process, stdout, stderr io.Writer) int {
+func streamEvents(ctx context.Context, proc eventSource, stdout, stderr io.Writer) int {
 	r := render.New(stdout)
 	events, errCh := proc.Events()
 	for {
