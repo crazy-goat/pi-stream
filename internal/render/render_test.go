@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -557,5 +558,128 @@ func TestResetReturnsToInitialState(t *testing.T) {
 	r.Text("fresh start")
 	if got := buf.String(); !strings.Contains(got, "fresh start") {
 		t.Errorf("Reset renderer should produce output, got %q", got)
+	}
+}
+
+func BenchmarkConsumeBoxSmall(b *testing.B) {
+	b.ReportAllocs()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("t1", "bash", event.Args{"command": "echo hi"})
+	box := r.tools["t1"]
+	snapshot := "line 1\nline 2\nline 3\n"
+	b.ResetTimer()
+	for range b.N {
+		box.snapshot = snapshot
+		box.bytesEmitted = 0
+		r.consumeBox(box)
+	}
+}
+
+func BenchmarkConsumeBoxLarge(b *testing.B) {
+	b.ReportAllocs()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("t1", "bash", event.Args{"command": "echo hi"})
+	box := r.tools["t1"]
+	var sb strings.Builder
+	for i := range 1000 {
+		fmt.Fprintf(&sb, "line %d: %s\n", i, strings.Repeat("data ", 20))
+	}
+	snapshot := sb.String()
+	b.ResetTimer()
+	for range b.N {
+		box.snapshot = snapshot
+		box.bytesEmitted = 0
+		r.consumeBox(box)
+	}
+}
+
+func BenchmarkMarshalJSON(b *testing.B) {
+	b.ReportAllocs()
+	args := event.Args{
+		"command": "echo hello world",
+		"path":    "/some/long/path/with/many/segments",
+		"timeout": "30s",
+	}
+	b.ResetTimer()
+	for range b.N {
+		_ = marshalJSON(args)
+	}
+}
+
+func BenchmarkMarshalJSONLarge(b *testing.B) {
+	b.ReportAllocs()
+	args := make(event.Args, 50)
+	for i := range 50 {
+		args[fmt.Sprintf("key_%d", i)] = strings.Repeat("value", 20)
+	}
+	b.ResetTimer()
+	for range b.N {
+		_ = marshalJSON(args)
+	}
+}
+
+func BenchmarkMarshalJSONUnencodable(b *testing.B) {
+	b.ReportAllocs()
+	args := event.Args{"ch": make(chan int)}
+	b.ResetTimer()
+	for range b.N {
+		_ = marshalJSON(args)
+	}
+}
+
+func BenchmarkFullRenderCycleSingle(b *testing.B) {
+	b.ReportAllocs()
+	var buf bytes.Buffer
+	b.ResetTimer()
+	for range b.N {
+		buf.Reset()
+		r := New(&buf)
+		r.Thinking("let me think about this carefully")
+		r.Text("here is the answer")
+		r.ToolExecStart("t1", "bash", event.Args{"command": "echo test"})
+		r.ToolExecUpdate("t1", "test\n")
+		r.ToolExecEnd("t1", false, "test\n")
+		r.TurnEnd()
+	}
+}
+
+func BenchmarkFullRenderCycleParallelTools(b *testing.B) {
+	b.ReportAllocs()
+	var buf bytes.Buffer
+	b.ResetTimer()
+	for range b.N {
+		buf.Reset()
+		r := New(&buf)
+		r.ToolExecStart("a", "bash", event.Args{"command": "long"})
+		r.ToolExecStart("b", "bash", event.Args{"command": "quick"})
+		r.ToolExecStart("c", "bash", event.Args{"command": "medium"})
+		r.ToolExecUpdate("a", "line a1\nline a2\n")
+		r.ToolExecUpdate("b", "line b1\n")
+		r.ToolExecUpdate("c", "line c1\nline c2\nline c3\n")
+		r.ToolExecEnd("b", false, "line b1\n")
+		r.ToolExecEnd("c", false, "line c1\nline c2\nline c3\n")
+		r.ToolExecEnd("a", false, "line a1\nline a2\n")
+		r.AgentEnd()
+	}
+}
+
+func BenchmarkFormatDuration(b *testing.B) {
+	b.ReportAllocs()
+	durations := []time.Duration{
+		0,
+		time.Millisecond,
+		500 * time.Millisecond,
+		time.Second,
+		1500 * time.Millisecond,
+		-100 * time.Millisecond,
+		3661 * time.Second,
+	}
+	b.ResetTimer()
+	for range b.N {
+		for _, d := range durations {
+			_ = formatDuration(d)
+		}
 	}
 }
