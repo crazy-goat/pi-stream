@@ -94,15 +94,21 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 }
 
 // streamEvents drains the process event channel until completion, an
-// error envelope, or context cancellation.
+// error envelope, a scanner error, or context cancellation.
 func streamEvents(ctx context.Context, proc *pi.Process, stdout, stderr io.Writer) int {
 	r := render.New(stdout)
-	events := proc.Events()
+	events, errCh := proc.Events()
 	for {
 		select {
 		case <-ctx.Done():
 			_ = proc.Kill()
 			return ExitInterrupt
+		case err := <-errCh:
+			if err != nil {
+				_, _ = fmt.Fprintf(stderr, "pi-stream: %v\n", err)
+				return ExitError
+			}
+			return ExitOK
 		case line, ok := <-events:
 			if !ok {
 				return ExitOK

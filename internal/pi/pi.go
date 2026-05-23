@@ -110,15 +110,19 @@ func Start(ctx context.Context, opts Options, prompt string, stderrOut io.Writer
 	return &Process{cmd: cmd, stdin: stdin, stdout: stdout}, nil
 }
 
-// Events returns a channel that emits each line of pi's stdout as a
-// freshly-copied byte slice. The channel is closed when stdout reaches
-// EOF (typically because pi exited or the context was canceled).
+// Events returns two channels: one that emits each line of pi's stdout as a
+// freshly-copied byte slice, and one that receives a single scanner error if
+// the scan loop encounters one (e.g. line exceeds buffer limit). The data
+// channel is closed when stdout reaches EOF. The error channel is closed
+// after the scan loop regardless of whether an error occurred.
 //
 // The returned slices are owned by the caller and survive the next read.
-func (p *Process) Events() <-chan []byte {
+func (p *Process) Events() (<-chan []byte, <-chan error) {
 	ch := make(chan []byte, 32)
+	errCh := make(chan error, 1)
 	go func() {
 		defer close(ch)
+		defer close(errCh)
 		sc := bufio.NewScanner(p.stdout)
 		sc.Buffer(make([]byte, 0, scanBufferInit), scanBufferMax)
 		for sc.Scan() {
@@ -127,8 +131,13 @@ func (p *Process) Events() <-chan []byte {
 			copy(cp, line)
 			ch <- cp
 		}
+		if err := sc.Err(); err != nil {
+			errCh <- fmt.Errorf("stdout scanner: %w", err)
+		} else {
+			errCh <- nil
+		}
 	}()
-	return ch
+	return ch, errCh
 }
 
 // Close closes the subprocess's stdin and waits for it to exit. The
