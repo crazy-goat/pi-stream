@@ -3,6 +3,7 @@ package render
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -563,8 +564,7 @@ func TestResetReturnsToInitialState(t *testing.T) {
 
 func BenchmarkConsumeBoxSmall(b *testing.B) {
 	b.ReportAllocs()
-	var buf bytes.Buffer
-	r := New(&buf)
+	r := New(io.Discard)
 	r.ToolExecStart("t1", "bash", event.Args{"command": "echo hi"})
 	box := r.tools["t1"]
 	snapshot := "line 1\nline 2\nline 3\n"
@@ -572,14 +572,15 @@ func BenchmarkConsumeBoxSmall(b *testing.B) {
 	for range b.N {
 		box.snapshot = snapshot
 		box.bytesEmitted = 0
+		box.lineBuf.Reset()
+		box.lineCount = 0
 		r.consumeBox(box)
 	}
 }
 
 func BenchmarkConsumeBoxLarge(b *testing.B) {
 	b.ReportAllocs()
-	var buf bytes.Buffer
-	r := New(&buf)
+	r := New(io.Discard)
 	r.ToolExecStart("t1", "bash", event.Args{"command": "echo hi"})
 	box := r.tools["t1"]
 	var sb strings.Builder
@@ -591,6 +592,8 @@ func BenchmarkConsumeBoxLarge(b *testing.B) {
 	for range b.N {
 		box.snapshot = snapshot
 		box.bytesEmitted = 0
+		box.lineBuf.Reset()
+		box.lineCount = 0
 		r.consumeBox(box)
 	}
 }
