@@ -653,15 +653,16 @@ func BenchmarkMarshalJSONUnencodable(b *testing.B) {
 func BenchmarkManyQueuedTools(b *testing.B) {
 	b.ReportAllocs()
 	var buf bytes.Buffer
+	const n = 1000
+	b.ResetTimer()
 	for range b.N {
 		buf.Reset()
 		r := New(&buf)
-		n := 1000
-		for i := range n {
+		for i := 0; i < n; i++ {
 			id := fmt.Sprintf("tool_%d", i)
 			r.ToolExecStart(id, "bash", event.Args{"command": fmt.Sprintf("echo %d", i)})
 		}
-		for i := range n {
+		for i := 0; i < n; i++ {
 			id := fmt.Sprintf("tool_%d", i)
 			r.ToolExecEnd(id, false, fmt.Sprintf("output %d\n", i))
 		}
