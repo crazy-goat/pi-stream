@@ -192,57 +192,42 @@ func TestHandleEventToolExecUpdateNilPartialResult(t *testing.T) {
 
 func TestHandleEventToolExecEndNilResult(t *testing.T) {
 	t.Parallel()
-	var out bytes.Buffer
-	r := render.New(&out)
-	done, code := handleEvent(r, event.Envelope{
-		Type:       event.TypeToolExecStart,
-		ToolCallID: "call-1",
-		ToolName:   "bash",
-		Args:       event.Args{"command": "x"},
-	}, &bytes.Buffer{})
-	if done || code != ExitOK {
-		t.Fatalf("start should not stop stream: done=%v code=%d", done, code)
+	tests := []struct {
+		name      string
+		isError   bool
+		wantGlyph string
+	}{
+		{name: "success", isError: false, wantGlyph: "✓"},
+		{name: "error", isError: true, wantGlyph: "✗"},
 	}
-	done, code = handleEvent(r, event.Envelope{
-		Type:       event.TypeToolExecEnd,
-		ToolCallID: "call-1",
-		IsError:    false,
-		Result:     nil,
-	}, &bytes.Buffer{})
-	if done || code != ExitOK {
-		t.Errorf("nil result end should not stop stream: done=%v code=%d", done, code)
-	}
-	got := testutil.StripANSI(out.String())
-	if !strings.Contains(got, "✓ bash") {
-		t.Errorf("expected closed box after nil result, got %q", got)
-	}
-}
-
-func TestHandleEventToolExecEndNilResultWithError(t *testing.T) {
-	t.Parallel()
-	var out bytes.Buffer
-	r := render.New(&out)
-	done, code := handleEvent(r, event.Envelope{
-		Type:       event.TypeToolExecStart,
-		ToolCallID: "call-1",
-		ToolName:   "bash",
-		Args:       event.Args{"command": "x"},
-	}, &bytes.Buffer{})
-	if done || code != ExitOK {
-		t.Fatalf("start should not stop stream: done=%v code=%d", done, code)
-	}
-	done, code = handleEvent(r, event.Envelope{
-		Type:       event.TypeToolExecEnd,
-		ToolCallID: "call-1",
-		IsError:    true,
-		Result:     nil,
-	}, &bytes.Buffer{})
-	if done || code != ExitOK {
-		t.Errorf("nil result error end should not stop stream: done=%v code=%d", done, code)
-	}
-	got := testutil.StripANSI(out.String())
-	if !strings.Contains(got, "✗ bash") {
-		t.Errorf("expected errored closed box (✗) after nil+error result, got %q", got)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var out bytes.Buffer
+			r := render.New(&out)
+			done, code := handleEvent(r, event.Envelope{
+				Type:       event.TypeToolExecStart,
+				ToolCallID: "call-1",
+				ToolName:   "bash",
+				Args:       event.Args{"command": "x"},
+			}, &bytes.Buffer{})
+			if done || code != ExitOK {
+				t.Fatalf("start should not stop stream: done=%v code=%d", done, code)
+			}
+			done, code = handleEvent(r, event.Envelope{
+				Type:       event.TypeToolExecEnd,
+				ToolCallID: "call-1",
+				IsError:    tc.isError,
+				Result:     nil,
+			}, &bytes.Buffer{})
+			if done || code != ExitOK {
+				t.Errorf("nil result end should not stop stream: done=%v code=%d", done, code)
+			}
+			got := testutil.StripANSI(out.String())
+			if !strings.Contains(got, tc.wantGlyph+" bash") {
+				t.Errorf("expected closed box with %q glyph, got %q", tc.wantGlyph, got)
+			}
+		})
 	}
 }
 
