@@ -16,6 +16,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -141,11 +142,10 @@ func (p *Process) Events() (<-chan []byte, <-chan error) {
 }
 
 // Close closes the subprocess's stdin and waits for it to exit. The
-// returned error is the wait error (e.g. non-zero exit) and may be nil
-// even if the subprocess crashed if pi's own exit code happened to be 0.
+// returned error combines both the stdin close error and the wait error
+// (e.g. non-zero exit) via errors.Join.
 func (p *Process) Close() error {
-	_ = p.stdin.Close()
-	return p.cmd.Wait()
+	return errors.Join(p.stdin.Close(), p.cmd.Wait())
 }
 
 // Kill terminates the subprocess immediately. It is safe to call after
