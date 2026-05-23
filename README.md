@@ -85,7 +85,7 @@ pi-stream --session /tmp/sess "follow-up that should remember the first"
 | 0    | Normal completion (`agent_end` received)         |
 | 1    | pi reported an error, or startup failed          |
 | 2    | Invalid CLI flags / missing prompt               |
-| 130  | Interrupted by `SIGINT` or `SIGTERM` (Ctrl+C)   |
+| 130  | Interrupted by `SIGINT` or `SIGTERM` — graceful shutdown on the **first** signal only. A second signal causes immediate OS termination. |
 
 ## Development
 
