@@ -7,6 +7,26 @@ package event
 
 import "strings"
 
+// Envelope type constants.
+const (
+	TypeResponse       = "response"
+	TypeMessageUpdate  = "message_update"
+	TypeToolExecStart  = "tool_execution_start"
+	TypeToolExecUpdate = "tool_execution_update"
+	TypeToolExecEnd    = "tool_execution_end"
+	TypeTurnStart      = "turn_start"
+	TypeTurnEnd        = "turn_end"
+	TypeAgentEnd       = "agent_end"
+	TypeError          = "error"
+)
+
+// AssistantMessageEvent type constants.
+const (
+	MsgTypeThinkingDelta = "thinking_delta"
+	MsgTypeThinksDelta   = "thinks_delta"
+	MsgTypeTextDelta     = "text_delta"
+)
+
 // Args represents tool arguments as a JSON object whose keys vary by tool
 // type (e.g. bash has "command", http has "url"). Use accessor methods
 // instead of raw map lookups with type assertions.
@@ -23,11 +43,11 @@ func (a Args) Command() (string, bool) {
 type Envelope struct {
 	Type string `json:"type"`
 
-	// Populated for type=="response".
+	// Populated for TypeResponse.
 	Success *bool  `json:"success,omitempty"`
 	Error   string `json:"error,omitempty"`
 
-	// Populated for type=="message_update".
+	// Populated for TypeMessageUpdate.
 	AssistantMessageEvent *AssistantMessageEvent `json:"assistantMessageEvent,omitempty"`
 
 	// Populated for type=="tool_execution_*".
