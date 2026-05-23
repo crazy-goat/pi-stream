@@ -2,8 +2,10 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/crazy-goat/pi-stream/internal/event"
 	"github.com/crazy-goat/pi-stream/internal/render"
@@ -121,6 +123,44 @@ func TestHandleMessageThinkingDelta(t *testing.T) {
 	handleMessage(r, &event.AssistantMessageEvent{Type: "thinking_delta", Delta: "hmm"})
 	if !strings.Contains(out.String(), "hmm") {
 		t.Errorf("thinking_delta not rendered: %q", out.String())
+	}
+}
+
+func TestRunInvalidThinkingFlag(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{"--thinking", "banana", "prompt"}, &bytes.Buffer{}, &stderr)
+	if code != ExitUsage {
+		t.Errorf("invalid thinking: code=%d, want %d", code, ExitUsage)
+	}
+	if !strings.Contains(stderr.String(), "invalid --thinking") {
+		t.Errorf("stderr missing invalid thinking error: %q", stderr.String())
+	}
+}
+
+func TestRunValidThinkingFlags(t *testing.T) {
+	validValues := []string{"off", "minimal", "low", "medium", "high", "xhigh"}
+	for _, v := range validValues {
+		v := v
+		t.Run(v, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			defer cancel()
+			code := Run(ctx, []string{"--thinking", v, "prompt"}, &bytes.Buffer{}, &bytes.Buffer{})
+			if code == ExitUsage {
+				t.Errorf("valid thinking %q returned ExitUsage", v)
+			}
+		})
+	}
+}
+
+func TestRunDefaultThinkingFlag(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	code := Run(ctx, []string{"prompt"}, &bytes.Buffer{}, &bytes.Buffer{})
+	if code == ExitUsage {
+		t.Errorf("default thinking \"high\" should pass validation, got ExitUsage")
 	}
 }
 

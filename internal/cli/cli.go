@@ -28,6 +28,12 @@ const (
 	ExitInterrupt = 130
 )
 
+// validThinking is the set of accepted --thinking flag values.
+var validThinking = map[string]bool{
+	"off": true, "minimal": true, "low": true,
+	"medium": true, "high": true, "xhigh": true,
+}
+
 // Run parses args (excluding the program name), launches pi, and streams
 // rendered output to stdout. Diagnostics go to stderr. The returned int
 // is the process exit code.
@@ -51,6 +57,11 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		if errors.Is(err, flag.ErrHelp) {
 			return ExitOK
 		}
+		return ExitUsage
+	}
+
+	if !validThinking[*thinking] {
+		_, _ = fmt.Fprintf(stderr, "invalid --thinking value %q; valid: off, minimal, low, medium, high, xhigh\n", *thinking)
 		return ExitUsage
 	}
 
