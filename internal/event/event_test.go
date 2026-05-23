@@ -99,6 +99,22 @@ func TestResultSummaryTextEmpty(t *testing.T) {
 	t.Parallel()
 	r := &Result{}
 	if got := r.SummaryText(); got != "" {
-		t.Errorf("empty SummaryText = %q", got)
+		t.Errorf("empty SummaryText = %q, want \"\"", got)
+	}
+}
+
+func TestResultSummaryTextSingleBlock(t *testing.T) {
+	t.Parallel()
+	r := &Result{Content: []ResultContent{{Text: "hello"}}}
+	if got := r.SummaryText(); got != "hello" {
+		t.Errorf("SummaryText = %q, want %q", got, "hello")
+	}
+}
+
+func TestResultSummaryTextMultipleBlocks(t *testing.T) {
+	t.Parallel()
+	r := &Result{Content: []ResultContent{{Text: "hello"}, {Text: " world"}, {Text: "!"}}}
+	if got := r.SummaryText(); got != "hello world!" {
+		t.Errorf("SummaryText = %q, want %q", got, "hello world!")
 	}
 }
