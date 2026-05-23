@@ -76,8 +76,8 @@ func TestToolExecStartNonBash(t *testing.T) {
 	r := New(&buf)
 	r.ToolExecStart("t1", "http", event.Args{"url": "https://example.com"})
 	got := buf.String()
-	if !strings.Contains(got, "┌─ ⚡ http") {
-		t.Errorf("expected top-of-box header, got %q", got)
+	if !strings.Contains(got, "┌─ ⚡ http ─") {
+		t.Errorf("expected header with ─ separator, got %q", got)
 	}
 	if !strings.Contains(got, `"url":"https://example.com"`) {
 		t.Errorf("expected JSON args, got %q", got)

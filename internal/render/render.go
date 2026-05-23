@@ -185,7 +185,7 @@ func (r *Renderer) emitHeader(b *toolBox) {
 	if cmd, ok := b.args.Command(); ok {
 		r.printf("%s┌─ ⚡ %s ─%s %s\n", ansiBoldCyan, b.name, ansiReset, cmd)
 	} else if len(b.args) > 0 {
-		r.printf("%s┌─ ⚡ %s%s %s\n", ansiBoldCyan, b.name, ansiReset, marshalJSON(b.args))
+		r.printf("%s┌─ ⚡ %s ─%s %s\n", ansiBoldCyan, b.name, ansiReset, marshalJSON(b.args))
 	} else {
 		r.printf("%s┌─ ⚡ %s%s\n", ansiBoldCyan, b.name, ansiReset)
 	}
