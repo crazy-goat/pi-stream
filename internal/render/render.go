@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/crazy-goat/pi-stream/internal/event"
@@ -49,8 +50,9 @@ type toolBox struct {
 // Renderer streams styled events to an io.Writer while tracking enough
 // state to insert section boundaries cleanly.
 //
-// A Renderer is not safe for concurrent use.
+// A Renderer is safe for concurrent use.
 type Renderer struct {
+	mu          sync.Mutex
 	out         io.Writer
 	state       State
 	atLineStart bool
@@ -73,6 +75,8 @@ func New(out io.Writer) *Renderer {
 // Thinking emits a thinking delta in dim italic. Consecutive deltas stay on
 // the same line; a transition from any other state inserts a newline first.
 func (r *Renderer) Thinking(delta string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.state != StateThink {
 		r.ensureNewline()
 	}
@@ -87,6 +91,8 @@ func (r *Renderer) Thinking(delta string) {
 // Text emits an assistant text delta. A pending thinking section is
 // flushed onto its own line first.
 func (r *Renderer) Text(delta string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.state == StateThink {
 		r.ensureNewline()
 	}
@@ -99,6 +105,8 @@ func (r *Renderer) Text(delta string) {
 // flow into it. Otherwise the call is queued; its header (and accumulated
 // output) is emitted once the active box closes.
 func (r *Renderer) ToolExecStart(id, name string, args event.Args) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	box := &toolBox{
 		id:        id,
 		name:      name,
@@ -118,6 +126,8 @@ func (r *Renderer) ToolExecStart(id, name string, args event.Args) {
 // If the call is the active one, newly-completed lines are streamed to the
 // terminal right away. Snapshots for queued calls accumulate silently.
 func (r *Renderer) ToolExecUpdate(id, snapshot string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	box, ok := r.tools[id]
 	if !ok {
 		return
@@ -133,6 +143,8 @@ func (r *Renderer) ToolExecUpdate(id, snapshot string) {
 // slot. If the call was queued, it stays queued (now marked ended) and is
 // rendered as a static box when its turn arrives.
 func (r *Renderer) ToolExecEnd(id string, isErr bool, fullText string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	box, ok := r.tools[id]
 	if !ok {
 		return
@@ -247,6 +259,8 @@ func (r *Renderer) emitToolLine(line string) {
 
 // TurnStart inserts a newline if the previous section left the cursor mid-line.
 func (r *Renderer) TurnStart() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.state != StateIdle {
 		r.ensureNewline()
 	}
@@ -254,12 +268,16 @@ func (r *Renderer) TurnStart() {
 
 // TurnEnd ensures the turn ends on a fresh line.
 func (r *Renderer) TurnEnd() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.ensureNewline()
 }
 
 // AgentEnd ensures the overall stream ends on a fresh line and cleans up
 // any in-flight or queued tool entries to prevent memory leaks.
 func (r *Renderer) AgentEnd() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.ensureNewline()
 	r.clearToolState()
 }
@@ -268,6 +286,8 @@ func (r *Renderer) AgentEnd() {
 // tool state, queue, and position tracking. The underlying writer retains
 // previously-written output; new content appends as if freshly constructed.
 func (r *Renderer) Reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.state = StateIdle
 	r.atLineStart = true
 	r.clearToolState()
@@ -285,6 +305,8 @@ func (r *Renderer) clearToolState() {
 
 // State returns the current renderer state. Intended for tests.
 func (r *Renderer) State() State {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return r.state
 }
 

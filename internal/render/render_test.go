@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -578,6 +579,37 @@ func TestResetReturnsToInitialState(t *testing.T) {
 	if got := buf.String(); !strings.Contains(got, "fresh start") {
 		t.Errorf("Reset renderer should produce output, got %q", got)
 	}
+}
+
+func TestRendererConcurrentAccess(t *testing.T) {
+	var buf bytes.Buffer
+	r := New(&buf)
+	var wg sync.WaitGroup
+
+	n := 50
+	wg.Add(4 * n)
+
+	for range n {
+		go func() {
+			defer wg.Done()
+			r.Thinking("thinking...")
+		}()
+		go func() {
+			defer wg.Done()
+			r.Text("some text")
+		}()
+		go func() {
+			defer wg.Done()
+			r.State()
+		}()
+		go func() {
+			defer wg.Done()
+			r.TurnStart()
+			r.TurnEnd()
+		}()
+	}
+
+	wg.Wait()
 }
 
 func BenchmarkConsumeBoxSmall(b *testing.B) {
