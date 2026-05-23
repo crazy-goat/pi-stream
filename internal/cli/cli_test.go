@@ -176,3 +176,39 @@ func TestHandleMessageToolCallEndIsNoOp(t *testing.T) {
 		t.Errorf("toolcall_end should not render — box comes from tool_execution_*; got %q", out.String())
 	}
 }
+
+func TestRunVersionFlag(t *testing.T) {
+	t.Parallel()
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"--version"}, &stdout, &stderr)
+	if code != ExitOK {
+		t.Errorf("--version: code=%d, want %d", code, ExitOK)
+	}
+	if stdout.String() != Version+"\n" {
+		t.Errorf("--version: stdout=%q, want %q", stdout.String(), Version+"\n")
+	}
+}
+
+func TestRunHelpFlag(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{"--help"}, &bytes.Buffer{}, &stderr)
+	if code != ExitOK {
+		t.Errorf("--help: code=%d, want %d", code, ExitOK)
+	}
+	if !strings.Contains(stderr.String(), "usage: pi-stream") {
+		t.Errorf("--help: stderr should contain usage, got %q", stderr.String())
+	}
+}
+
+func TestRunNoArgs(t *testing.T) {
+	t.Parallel()
+	var stderr bytes.Buffer
+	code := Run(context.Background(), []string{}, &bytes.Buffer{}, &stderr)
+	if code != ExitUsage {
+		t.Errorf("no args: code=%d, want %d", code, ExitUsage)
+	}
+	if !strings.Contains(stderr.String(), "usage: pi-stream") {
+		t.Errorf("no args: stderr should contain usage, got %q", stderr.String())
+	}
+}
