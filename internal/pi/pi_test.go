@@ -248,6 +248,87 @@ func TestEventsHandlesLargeLines(t *testing.T) {
 	}
 }
 
+func TestCloseReturnsWaitErrorForNonZeroExit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping subprocess test in short mode")
+	}
+
+	cmd := helperCommand(t, "sh", "-c", "exit 42")
+	stdin, _ := cmd.StdinPipe()
+	stdout, _ := cmd.StdoutPipe()
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	p := &Process{cmd: cmd, stdin: stdin, stdout: stdout}
+	err := p.Close()
+	if err == nil {
+		t.Fatal("expected error for non-zero exit, got nil")
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Errorf("expected *exec.ExitError, got %T: %v", err, err)
+	}
+}
+
+func TestCloseReturnsStdinErrorOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping subprocess test in short mode")
+	}
+	p := &Process{
+		stdin: &failOnCloseWriter{},
+	}
+	cmd := exec.Command("sh", "-c", "exit 0")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	p.cmd = cmd
+
+	err := p.Close()
+	if err == nil {
+		t.Fatal("expected stdin close error, got nil")
+	}
+	if !errors.Is(err, errFakeStdinClose) {
+		t.Errorf("expected errFakeStdinClose, got %v", err)
+	}
+}
+
+func TestCloseReturnsBothErrors(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping subprocess test in short mode")
+	}
+
+	p := &Process{
+		stdin: &failOnCloseWriter{},
+	}
+	cmd := helperCommand(t, "sh", "-c", "exit 42")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	p.cmd = cmd
+
+	err := p.Close()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, errFakeStdinClose) {
+		t.Errorf("expected errFakeStdinClose, got %v", err)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Errorf("expected *exec.ExitError, got %T: %v", err, err)
+	}
+}
+
+// failOnCloseWriter is an io.WriteCloser that returns errFakeStdinClose on Close.
+var errFakeStdinClose = errors.New("fake stdin close error")
+
+type failOnCloseWriter struct{}
+
+func (w *failOnCloseWriter) Write(p []byte) (int, error) { return len(p), nil }
+func (w *failOnCloseWriter) Close() error                { return errFakeStdinClose }
+
 // helperCommand returns an *exec.Cmd for the given arguments by finding
 // the binary via exec.LookPath instead of requiring os/exec import at the
 // call site.
