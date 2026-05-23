@@ -198,11 +198,13 @@ func (r *Renderer) consumeBox(b *toolBox) {
 	if len(b.snapshot) <= b.bytesEmitted {
 		return
 	}
-	delta := b.snapshot[b.bytesEmitted:]
+	s := b.snapshot[b.bytesEmitted:]
 	b.bytesEmitted = len(b.snapshot)
-	b.lineBuf.WriteString(delta)
-	s := b.lineBuf.String()
-	b.lineBuf.Reset()
+	if b.lineBuf.Len() > 0 {
+		b.lineBuf.WriteString(s)
+		s = b.lineBuf.String()
+		b.lineBuf.Reset()
+	}
 	for {
 		i := strings.IndexByte(s, '\n')
 		if i < 0 {
@@ -212,7 +214,9 @@ func (r *Renderer) consumeBox(b *toolBox) {
 		b.lineCount++
 		s = s[i+1:]
 	}
-	b.lineBuf.WriteString(s)
+	if len(s) > 0 {
+		b.lineBuf.WriteString(s)
+	}
 }
 
 func (r *Renderer) closeBox(b *toolBox) {
