@@ -383,3 +383,74 @@ func TestFormatDurationSubMillisecond(t *testing.T) {
 		t.Errorf("formatDuration(500µs) = %q, want %q", got, "0ms")
 	}
 }
+
+func TestAgentEndCleansUpOrphanedTools(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
+	r.ToolExecStart("t2", "bash", event.Args{"command": "y"})
+	r.ToolExecStart("t3", "bash", event.Args{"command": "z"})
+	if len(r.tools) == 0 {
+		t.Fatal("expected tools to be populated before AgentEnd")
+	}
+	r.AgentEnd()
+	if len(r.tools) != 0 {
+		t.Errorf("AgentEnd should clear tools map, got %d entries", len(r.tools))
+	}
+	if r.queue != nil {
+		t.Errorf("AgentEnd should reset queue to nil, got %v", r.queue)
+	}
+	if r.activeID != "" {
+		t.Errorf("AgentEnd should clear activeID, got %q", r.activeID)
+	}
+}
+
+func TestAgentEndWithNoToolsIsNoOp(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.Text("hello")
+	r.AgentEnd()
+	if len(r.tools) != 0 {
+		t.Errorf("tools should be empty, got %d", len(r.tools))
+	}
+	if r.queue != nil {
+		t.Errorf("queue should be nil, got %v", r.queue)
+	}
+	if r.activeID != "" {
+		t.Errorf("activeID should be empty, got %q", r.activeID)
+	}
+}
+
+func TestResetReturnsToInitialState(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
+	r.ToolExecStart("t2", "bash", event.Args{"command": "y"})
+	r.ToolExecUpdate("t1", "line 1\n")
+	r.Text("some text")
+	r.Thinking("hmm")
+	r.Reset()
+	if r.State() != StateIdle {
+		t.Errorf("Reset should set state to StateIdle, got %v", r.State())
+	}
+	if len(r.tools) != 0 {
+		t.Errorf("Reset should clear tools map, got %d entries", len(r.tools))
+	}
+	if r.queue != nil {
+		t.Errorf("Reset should set queue to nil, got %v", r.queue)
+	}
+	if !r.atLineStart {
+		t.Errorf("Reset should set atLineStart to true")
+	}
+	if r.activeID != "" {
+		t.Errorf("Reset should clear activeID, got %q", r.activeID)
+	}
+	// After Reset, the renderer should accept new content cleanly
+	r.Text("fresh start")
+	if got := buf.String(); !strings.Contains(got, "fresh start") {
+		t.Errorf("Reset renderer should produce output, got %q", got)
+	}
+}

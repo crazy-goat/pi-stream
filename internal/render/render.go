@@ -250,9 +250,30 @@ func (r *Renderer) TurnEnd() {
 	r.ensureNewline()
 }
 
-// AgentEnd ensures the overall stream ends on a fresh line.
+// AgentEnd ensures the overall stream ends on a fresh line and cleans up
+// any in-flight or queued tool entries to prevent memory leaks.
 func (r *Renderer) AgentEnd() {
 	r.ensureNewline()
+	r.clearToolState()
+}
+
+// Reset returns the Renderer to its initial state, clearing all accumulated
+// tool state, queue, and position tracking. The underlying writer retains
+// previously-written output; new content appends as if freshly constructed.
+func (r *Renderer) Reset() {
+	r.state = StateIdle
+	r.atLineStart = true
+	r.clearToolState()
+}
+
+// clearToolState drains all tool entries and the queue. Called by AgentEnd
+// and Reset to prevent memory leaks from orphaned toolBox structs.
+func (r *Renderer) clearToolState() {
+	r.activeID = ""
+	for id := range r.tools {
+		delete(r.tools, id)
+	}
+	r.queue = nil
 }
 
 // State returns the current renderer state. Intended for tests.
