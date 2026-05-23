@@ -129,38 +129,37 @@ func streamEvents(ctx context.Context, proc *pi.Process, stdout, stderr io.Write
 // the stream should terminate (agent_end, fatal response/error envelope).
 func handleEvent(r *render.Renderer, env event.Envelope, stderr io.Writer) (bool, int) {
 	switch env.Type {
-	case "response":
+	case event.TypeResponse:
 		if env.Success != nil && !*env.Success {
 			_, _ = fmt.Fprintf(stderr, "pi error: %s\n", env.Error)
 			return true, ExitError
 		}
-	case "message_update":
+	case event.TypeMessageUpdate:
 		if env.AssistantMessageEvent != nil {
 			handleMessage(r, env.AssistantMessageEvent)
 		}
-	case "tool_execution_start":
+	case event.TypeToolExecStart:
 		r.ToolExecStart(env.ToolCallID, env.ToolName, env.Args)
-	case "tool_execution_update":
-		// PartialResult can be nil; skip the call entirely since there is
-		// nothing to stream. ToolExecEnd must always run (it closes the
-		// box and promotes queued calls) so only SummaryText is guarded.
+	case event.TypeToolExecUpdate:
+		// PartialResult can be nil; skip the call since there is nothing
+		// to stream. ToolExecEnd must always run (it closes the box).
 		if env.PartialResult != nil {
 			r.ToolExecUpdate(env.ToolCallID, env.PartialResult.SummaryText())
 		}
-	case "tool_execution_end":
+	case event.TypeToolExecEnd:
 		var summary string
 		if env.Result != nil {
 			summary = env.Result.SummaryText()
 		}
 		r.ToolExecEnd(env.ToolCallID, env.IsError, summary)
-	case "turn_start":
+	case event.TypeTurnStart:
 		r.TurnStart()
-	case "turn_end":
+	case event.TypeTurnEnd:
 		r.TurnEnd()
-	case "agent_end":
+	case event.TypeAgentEnd:
 		r.AgentEnd()
 		return true, ExitOK
-	case "error":
+	case event.TypeError:
 		msg := env.Error
 		if env.AssistantMessageEvent != nil && env.AssistantMessageEvent.Error != "" {
 			msg = env.AssistantMessageEvent.Error
@@ -173,9 +172,9 @@ func handleEvent(r *render.Renderer, env event.Envelope, stderr io.Writer) (bool
 
 func handleMessage(r *render.Renderer, msg *event.AssistantMessageEvent) {
 	switch msg.Type {
-	case "thinking_delta", "thinks_delta":
+	case event.MsgTypeThinkingDelta, event.MsgTypeThinksDelta:
 		r.Thinking(msg.Delta)
-	case "text_delta":
+	case event.MsgTypeTextDelta:
 		r.Text(msg.Delta)
 		// thinking_start, text_start, toolcall_*: no-op. The tool-execution
 		// box (rendered from tool_execution_* events) is enough; rendering

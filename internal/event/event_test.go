@@ -12,8 +12,8 @@ func TestEnvelopeUnmarshalResponseSuccess(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &env); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if env.Type != "response" {
-		t.Errorf("type = %q, want %q", env.Type, "response")
+	if env.Type != TypeResponse {
+		t.Errorf("type = %q, want %q", env.Type, TypeResponse)
 	}
 	if env.Success == nil || !*env.Success {
 		t.Errorf("Success = %v, want true", env.Success)
@@ -45,7 +45,7 @@ func TestEnvelopeUnmarshalTextDelta(t *testing.T) {
 	if env.AssistantMessageEvent == nil {
 		t.Fatal("AssistantMessageEvent is nil")
 	}
-	if env.AssistantMessageEvent.Type != "text_delta" {
+	if env.AssistantMessageEvent.Type != MsgTypeTextDelta {
 		t.Errorf("inner type = %q", env.AssistantMessageEvent.Type)
 	}
 	if env.AssistantMessageEvent.Delta != "hello" {
@@ -116,5 +116,30 @@ func TestResultSummaryTextMultipleBlocks(t *testing.T) {
 	r := &Result{Content: []ResultContent{{Text: "hello"}, {Text: " world"}, {Text: "!"}}}
 	if got := r.SummaryText(); got != "hello world!" {
 		t.Errorf("SummaryText = %q, want %q", got, "hello world!")
+	}
+}
+
+func TestEventTypeConstants(t *testing.T) {
+	tests := []struct {
+		got  string
+		want string
+	}{
+		{TypeResponse, "response"},
+		{TypeMessageUpdate, "message_update"},
+		{TypeToolExecStart, "tool_execution_start"},
+		{TypeToolExecUpdate, "tool_execution_update"},
+		{TypeToolExecEnd, "tool_execution_end"},
+		{TypeTurnStart, "turn_start"},
+		{TypeTurnEnd, "turn_end"},
+		{TypeAgentEnd, "agent_end"},
+		{TypeError, "error"},
+		{MsgTypeThinkingDelta, "thinking_delta"},
+		{MsgTypeThinksDelta, "thinks_delta"},
+		{MsgTypeTextDelta, "text_delta"},
+	}
+	for _, tc := range tests {
+		if tc.got != tc.want {
+			t.Errorf("constant = %q, want %q", tc.got, tc.want)
+		}
 	}
 }

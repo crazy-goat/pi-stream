@@ -15,7 +15,7 @@ import (
 func TestHandleEventAgentEndStopsAndSucceeds(t *testing.T) {
 	t.Parallel()
 	r := render.New(&bytes.Buffer{})
-	done, code := handleEvent(r, event.Envelope{Type: "agent_end"}, &bytes.Buffer{})
+	done, code := handleEvent(r, event.Envelope{Type: event.TypeAgentEnd}, &bytes.Buffer{})
 	if !done || code != ExitOK {
 		t.Errorf("agent_end: done=%v code=%d, want true,%d", done, code, ExitOK)
 	}
@@ -24,7 +24,7 @@ func TestHandleEventAgentEndStopsAndSucceeds(t *testing.T) {
 func TestHandleEventErrorEnvelopeStopsWithErr(t *testing.T) {
 	t.Parallel()
 	var stderr bytes.Buffer
-	done, code := handleEvent(render.New(&bytes.Buffer{}), event.Envelope{Type: "error", Error: "boom"}, &stderr)
+	done, code := handleEvent(render.New(&bytes.Buffer{}), event.Envelope{Type: event.TypeError, Error: "boom"}, &stderr)
 	if !done || code != ExitError {
 		t.Errorf("error: done=%v code=%d, want true,%d", done, code, ExitError)
 	}
@@ -39,7 +39,7 @@ func TestHandleEventResponseFailureStopsWithErr(t *testing.T) {
 	ok := false
 	done, code := handleEvent(
 		render.New(&bytes.Buffer{}),
-		event.Envelope{Type: "response", Success: &ok, Error: "denied"},
+		event.Envelope{Type: event.TypeResponse, Success: &ok, Error: "denied"},
 		&stderr,
 	)
 	if !done || code != ExitError {
@@ -55,9 +55,9 @@ func TestHandleEventTextDeltaRenders(t *testing.T) {
 	var out bytes.Buffer
 	r := render.New(&out)
 	done, code := handleEvent(r, event.Envelope{
-		Type: "message_update",
+		Type: event.TypeMessageUpdate,
 		AssistantMessageEvent: &event.AssistantMessageEvent{
-			Type:  "text_delta",
+			Type:  event.MsgTypeTextDelta,
 			Delta: "hello",
 		},
 	}, &bytes.Buffer{})
@@ -74,13 +74,13 @@ func TestHandleEventToolExecEndRenders(t *testing.T) {
 	var out bytes.Buffer
 	r := render.New(&out)
 	_, _ = handleEvent(r, event.Envelope{
-		Type:       "tool_execution_start",
+		Type:       event.TypeToolExecStart,
 		ToolCallID: "call-1",
 		ToolName:   "bash",
 		Args:       event.Args{"command": "x"},
 	}, &bytes.Buffer{})
 	_, _ = handleEvent(r, event.Envelope{
-		Type:       "tool_execution_end",
+		Type:       event.TypeToolExecEnd,
 		ToolCallID: "call-1",
 		ToolName:   "bash",
 		IsError:    false,
@@ -103,7 +103,7 @@ func TestHandleEventToolExecUpdateStreamsLines(t *testing.T) {
 	r := render.New(&out)
 	r.ToolExecStart("call-1", "bash", event.Args{"command": "seq 1 2"})
 	_, _ = handleEvent(r, event.Envelope{
-		Type:       "tool_execution_update",
+		Type:       event.TypeToolExecUpdate,
 		ToolCallID: "call-1",
 		ToolName:   "bash",
 		PartialResult: &event.Result{Content: []event.ResultContent{
@@ -120,7 +120,7 @@ func TestHandleMessageThinkingDelta(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
 	r := render.New(&out)
-	handleMessage(r, &event.AssistantMessageEvent{Type: "thinking_delta", Delta: "hmm"})
+	handleMessage(r, &event.AssistantMessageEvent{Type: event.MsgTypeThinkingDelta, Delta: "hmm"})
 	if !strings.Contains(out.String(), "hmm") {
 		t.Errorf("thinking_delta not rendered: %q", out.String())
 	}
@@ -170,7 +170,7 @@ func TestHandleEventToolExecUpdateNilPartialResult(t *testing.T) {
 	r := render.New(&out)
 	r.ToolExecStart("call-1", "bash", event.Args{"command": "x"})
 	done, code := handleEvent(r, event.Envelope{
-		Type:          "tool_execution_update",
+		Type:          event.TypeToolExecUpdate,
 		ToolCallID:    "call-1",
 		PartialResult: nil,
 	}, &bytes.Buffer{})
@@ -179,7 +179,7 @@ func TestHandleEventToolExecUpdateNilPartialResult(t *testing.T) {
 	}
 	// Verify the box is still open (no footer yet) after nil update.
 	_, _ = handleEvent(r, event.Envelope{
-		Type:       "tool_execution_end",
+		Type:       event.TypeToolExecEnd,
 		ToolCallID: "call-1",
 		IsError:    false,
 		Result:     nil,
@@ -195,7 +195,7 @@ func TestHandleEventToolExecEndNilResult(t *testing.T) {
 	var out bytes.Buffer
 	r := render.New(&out)
 	done, code := handleEvent(r, event.Envelope{
-		Type:       "tool_execution_start",
+		Type:       event.TypeToolExecStart,
 		ToolCallID: "call-1",
 		ToolName:   "bash",
 		Args:       event.Args{"command": "x"},
@@ -204,7 +204,7 @@ func TestHandleEventToolExecEndNilResult(t *testing.T) {
 		t.Fatalf("start should not stop stream: done=%v code=%d", done, code)
 	}
 	done, code = handleEvent(r, event.Envelope{
-		Type:       "tool_execution_end",
+		Type:       event.TypeToolExecEnd,
 		ToolCallID: "call-1",
 		IsError:    false,
 		Result:     nil,
@@ -223,7 +223,7 @@ func TestHandleEventToolExecEndNilResultWithError(t *testing.T) {
 	var out bytes.Buffer
 	r := render.New(&out)
 	done, code := handleEvent(r, event.Envelope{
-		Type:       "tool_execution_start",
+		Type:       event.TypeToolExecStart,
 		ToolCallID: "call-1",
 		ToolName:   "bash",
 		Args:       event.Args{"command": "x"},
@@ -232,7 +232,7 @@ func TestHandleEventToolExecEndNilResultWithError(t *testing.T) {
 		t.Fatalf("start should not stop stream: done=%v code=%d", done, code)
 	}
 	done, code = handleEvent(r, event.Envelope{
-		Type:       "tool_execution_end",
+		Type:       event.TypeToolExecEnd,
 		ToolCallID: "call-1",
 		IsError:    true,
 		Result:     nil,
