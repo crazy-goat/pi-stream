@@ -24,9 +24,15 @@ import (
 
 // Buffer sizes for the stdout scanner. The initial buffer is small but the
 // scanner will grow it on demand up to scanBufferMax before failing.
+//
+// scanBufferMax is set to 10 MB to handle large tool outputs without
+// truncation. The pi subprocess can return JSON event lines exceeding 1 MB
+// for commands like cat of large files, read of binary files (base64 ~33%
+// overhead), or tools with deeply nested JSON arguments, so 10 MB provides
+// comfortable headroom for real-world usage.
 const (
 	scanBufferInit = 64 * 1024
-	scanBufferMax  = 1024 * 1024
+	scanBufferMax  = 10 * 1024 * 1024
 )
 
 // Options configures a pi invocation. Every field is optional.
