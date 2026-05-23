@@ -354,6 +354,66 @@ func TestParallelToolEndsBeforeFirstFinishes(t *testing.T) {
 	}
 }
 
+func TestQueueNilWhenDrained(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("a", "bash", event.Args{"command": "echo a"})
+	r.ToolExecStart("b", "bash", event.Args{"command": "echo b"})
+	r.ToolExecStart("c", "bash", event.Args{"command": "echo c"})
+	// End A — promotes B (ends), promotes C (ends), queue drains to nil.
+	r.ToolExecEnd("a", false, "a\n")
+	r.ToolExecEnd("b", false, "b\n")
+	r.ToolExecEnd("c", false, "c\n")
+	if r.queue != nil {
+		t.Errorf("queue should be nil when fully drained, got %v", r.queue)
+	}
+}
+
+func TestQueueNilWhenSingleToolEnds(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("a", "bash", event.Args{"command": "echo a"})
+	r.ToolExecEnd("a", false, "a\n")
+	if r.queue != nil {
+		t.Errorf("queue should be nil after single tool ends, got %v", r.queue)
+	}
+}
+
+func TestPromoteNextOnNilQueueDoesNotPanic(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("a", "bash", event.Args{"command": "echo a"})
+	r.ToolExecEnd("a", false, "a\n")
+	// promoteNext already ran inside ToolExecEnd; calling again on nil
+	// queue must not panic (regression guard).
+	defer func() {
+		if p := recover(); p != nil {
+			t.Errorf("promoteNext panicked on nil queue: %v", p)
+		}
+	}()
+	r.promoteNext()
+}
+
+func TestQueueNotNilWhenPendingItemsExist(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("a", "bash", event.Args{"command": "echo a"})
+	r.ToolExecStart("b", "bash", event.Args{"command": "echo b"})
+	r.ToolExecStart("c", "bash", event.Args{"command": "echo c"})
+	// End A — promotes B (active). B is active, C is still queued.
+	r.ToolExecEnd("a", false, "a\n")
+	if r.queue == nil {
+		t.Errorf("queue should not be nil when items remain pending")
+	}
+	if len(r.queue) != 1 {
+		t.Errorf("expected 1 pending item in queue, got %d", len(r.queue))
+	}
+}
+
 func TestFormatDuration(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
