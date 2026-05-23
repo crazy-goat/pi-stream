@@ -3,6 +3,7 @@ package pi
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"reflect"
@@ -226,8 +227,8 @@ func TestEventsHandlesLargeLines(t *testing.T) {
 	}
 	p := &Process{stdout: r}
 
-	// Use a line that fits within scanBufferMax
-	largeLine := strings.Repeat("A", 500*1024)
+	// Use a 5 MB line to verify the 10 MB buffer handles large tool outputs.
+	largeLine := strings.Repeat("A", 5*1024*1024)
 	go func() {
 		_, _ = w.Write([]byte(largeLine + "\n"))
 		_ = w.Close()
@@ -245,6 +246,42 @@ func TestEventsHandlesLargeLines(t *testing.T) {
 	err = <-errCh
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func BenchmarkEventsLargeLine(b *testing.B) {
+	for _, size := range []int{1, 5, 10} {
+		b.Run(fmt.Sprintf("%dMB", size), func(b *testing.B) {
+			// Subtract 2 to leave room for "\n" so even the 10MB case
+			// stays within scanBufferMax.
+			line := []byte(strings.Repeat("X", size*1024*1024-2) + "\n")
+			b.ReportAllocs()
+			b.SetBytes(int64(len(line)))
+
+			b.StopTimer()
+			for i := 0; i < b.N; i++ {
+				r, w, err := os.Pipe()
+				if err != nil {
+					b.Fatal(err)
+				}
+				p := &Process{stdout: r}
+
+				go func() {
+					_, _ = w.Write(line)
+					_ = w.Close()
+				}()
+
+				b.StartTimer()
+				events, errCh := p.Events()
+				for range events {
+				}
+				if err := <-errCh; err != nil {
+					b.Error(err)
+				}
+				b.StopTimer()
+				_ = r.Close()
+			}
+		})
 	}
 }
 
