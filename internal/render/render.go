@@ -289,6 +289,9 @@ func marshalJSON(v any) string {
 }
 
 func formatDuration(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
 	if d < time.Second {
 		return fmt.Sprintf("%dms", d.Milliseconds())
 	}

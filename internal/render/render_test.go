@@ -360,11 +360,21 @@ func TestFormatDuration(t *testing.T) {
 		{999, "999ms"},
 		{1000, "1.0s"},
 		{1500, "1.5s"},
+		{-500, "0ms"},
+		{3661000, "3661.0s"},
 	}
 	for _, c := range cases {
 		got := formatDuration(time.Duration(c.ms) * time.Millisecond)
 		if got != c.want {
 			t.Errorf("formatDuration(%dms) = %q, want %q", c.ms, got, c.want)
 		}
+	}
+}
+
+func TestFormatDurationSubMillisecond(t *testing.T) {
+	t.Parallel()
+	got := formatDuration(500 * time.Microsecond)
+	if got != "0ms" {
+		t.Errorf("formatDuration(500µs) = %q, want %q", got, "0ms")
 	}
 }
