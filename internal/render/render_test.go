@@ -243,6 +243,25 @@ func TestMarshalJSONNoHTMLEscape(t *testing.T) {
 	}
 }
 
+func TestMarshalJSONNil(t *testing.T) {
+	t.Parallel()
+	got := marshalJSON(nil)
+	if got != "null" {
+		t.Errorf("marshalJSON(nil) = %q, want %q", got, "null")
+	}
+}
+
+func TestMarshalJSONUnencodableValue(t *testing.T) {
+	t.Parallel()
+	got := marshalJSON(map[string]any{"ch": make(chan int)})
+	if got == "" || strings.Contains(got, "null") {
+		t.Errorf("marshalJSON with unencodable value should return fallback, got %q", got)
+	}
+	if !strings.Contains(got, "ch:") {
+		t.Errorf("marshalJSON fallback should contain the key name, got %q", got)
+	}
+}
+
 func TestEnsureNewlineMidLine(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer

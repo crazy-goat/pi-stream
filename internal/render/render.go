@@ -280,11 +280,15 @@ func (r *Renderer) printf(format string, args ...any) {
 
 // marshalJSON renders v as compact JSON without Go's default HTML escaping,
 // so &, <, > survive intact in tool argument blobs.
+// If v cannot be encoded as JSON (e.g. channels, functions), it falls back
+// to fmt.Sprintf so the caller always gets a meaningful representation.
 func marshalJSON(v any) string {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
-	_ = enc.Encode(v)
+	if err := enc.Encode(v); err != nil {
+		return fmt.Sprintf("%v", v)
+	}
 	return strings.TrimRight(buf.String(), "\n")
 }
 
