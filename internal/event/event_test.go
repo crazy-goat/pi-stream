@@ -67,7 +67,7 @@ func TestEnvelopeUnmarshalToolCallEnd(t *testing.T) {
 	if tc.Name != "bash" {
 		t.Errorf("name = %q", tc.Name)
 	}
-	if got, _ := tc.Arguments["command"].(string); got != "ls" {
+	if got, _ := tc.Arguments.Command(); got != "ls" {
 		t.Errorf("command = %q", got)
 	}
 }
