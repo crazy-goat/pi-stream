@@ -141,9 +141,18 @@ func handleEvent(r *render.Renderer, env event.Envelope, stderr io.Writer) (bool
 	case "tool_execution_start":
 		r.ToolExecStart(env.ToolCallID, env.ToolName, env.Args)
 	case "tool_execution_update":
-		r.ToolExecUpdate(env.ToolCallID, env.PartialResult.SummaryText())
+		// PartialResult can be nil; skip the call entirely since there is
+		// nothing to stream. ToolExecEnd must always run (it closes the
+		// box and promotes queued calls) so only SummaryText is guarded.
+		if env.PartialResult != nil {
+			r.ToolExecUpdate(env.ToolCallID, env.PartialResult.SummaryText())
+		}
 	case "tool_execution_end":
-		r.ToolExecEnd(env.ToolCallID, env.IsError, env.Result.SummaryText())
+		var summary string
+		if env.Result != nil {
+			summary = env.Result.SummaryText()
+		}
+		r.ToolExecEnd(env.ToolCallID, env.IsError, summary)
 	case "turn_start":
 		r.TurnStart()
 	case "turn_end":
