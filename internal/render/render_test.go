@@ -304,6 +304,51 @@ func TestTurnAndAgentEndOnFreshLine(t *testing.T) {
 	}
 }
 
+func TestTurnStartIdleNoOutput(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.TurnStart()
+	if out := buf.String(); out != "" {
+		t.Errorf("TurnStart() on idle renderer should produce no output, got %q", out)
+	}
+}
+
+func TestTurnStartAfterTextInsertsNewline(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.Text("hello")
+	r.TurnStart()
+	if got, want := buf.String(), "hello\n"; got != want {
+		t.Errorf("TurnStart after text = %q, want %q", got, want)
+	}
+}
+
+func TestTurnStartAfterThinkingInsertsNewline(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.Thinking("hmm")
+	r.TurnStart()
+	got := buf.String()
+	if !strings.HasSuffix(got, "\n") {
+		t.Errorf("TurnStart after Thinking should insert newline, got %q", got)
+	}
+}
+
+func TestTurnStartAfterNewlineNoDoubleNewline(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.Text("hello\n")
+	r.TurnStart()
+	got := buf.String()
+	if strings.HasSuffix(got, "\n\n") {
+		t.Errorf("TurnStart after text ending with newline should not double it, got %q", got)
+	}
+}
+
 func TestParallelToolsRenderSequentially(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
