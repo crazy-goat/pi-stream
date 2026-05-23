@@ -7,6 +7,7 @@ import (
 
 	"github.com/crazy-goat/pi-stream/internal/event"
 	"github.com/crazy-goat/pi-stream/internal/render"
+	"github.com/crazy-goat/pi-stream/internal/testutil"
 )
 
 func TestHandleEventAgentEndStopsAndSucceeds(t *testing.T) {
@@ -85,7 +86,7 @@ func TestHandleEventToolExecEndRenders(t *testing.T) {
 			{Text: "ok"},
 		}},
 	}, &bytes.Buffer{})
-	got := stripANSI(out.String())
+	got := testutil.StripANSI(out.String())
 	if !strings.Contains(got, "│ ok") {
 		t.Errorf("expected output line in box, got %q", got)
 	}
@@ -107,25 +108,10 @@ func TestHandleEventToolExecUpdateStreamsLines(t *testing.T) {
 			{Text: "line 1\n"},
 		}},
 	}, &bytes.Buffer{})
-	got := stripANSI(out.String())
+	got := testutil.StripANSI(out.String())
 	if !strings.Contains(got, "│ line 1") {
 		t.Errorf("expected streamed line, got %q", got)
 	}
-}
-
-func stripANSI(s string) string {
-	var b strings.Builder
-	for i := 0; i < len(s); i++ {
-		if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '[' {
-			i += 2
-			for i < len(s) && s[i] >= 0x20 && s[i] < 0x40 {
-				i++
-			}
-			continue
-		}
-		b.WriteByte(s[i])
-	}
-	return b.String()
 }
 
 func TestHandleMessageThinkingDelta(t *testing.T) {

@@ -5,24 +5,9 @@ import (
 	"strings"
 	"testing"
 	"time"
-)
 
-// stripANSI removes CSI escape sequences so tests can assert against the
-// visible text without having to know the exact color codes.
-func stripANSI(s string) string {
-	var b strings.Builder
-	for i := 0; i < len(s); i++ {
-		if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '[' {
-			i += 2
-			for i < len(s) && s[i] >= 0x20 && s[i] < 0x40 {
-				i++
-			}
-			continue
-		}
-		b.WriteByte(s[i])
-	}
-	return b.String()
-}
+	"github.com/crazy-goat/pi-stream/internal/testutil"
+)
 
 func TestTextStreamsConcatenated(t *testing.T) {
 	t.Parallel()
@@ -119,7 +104,7 @@ func TestToolExecUpdateStreamsCompleteLinesOnly(t *testing.T) {
 	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
 
 	r.ToolExecUpdate("t1", "line 1\nline ")
-	got := stripANSI(buf.String())
+	got := testutil.StripANSI(buf.String())
 	if !strings.Contains(got, "│ line 1\n") {
 		t.Errorf("expected complete line emitted, got %q", got)
 	}
@@ -128,7 +113,7 @@ func TestToolExecUpdateStreamsCompleteLinesOnly(t *testing.T) {
 	}
 
 	r.ToolExecUpdate("t1", "line 1\nline 2\n")
-	got = stripANSI(buf.String())
+	got = testutil.StripANSI(buf.String())
 	if !strings.Contains(got, "│ line 2\n") {
 		t.Errorf("expected second line emitted after newline arrived, got %q", got)
 	}
@@ -154,7 +139,7 @@ func TestToolExecEndFlushesBufferedPartialLine(t *testing.T) {
 	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
 	r.ToolExecUpdate("t1", "trailing without newline")
 	r.ToolExecEnd("t1", false, "trailing without newline")
-	got := stripANSI(buf.String())
+	got := testutil.StripANSI(buf.String())
 	if !strings.Contains(got, "│ trailing without newline\n") {
 		t.Errorf("expected buffered partial line flushed on end, got %q", got)
 	}
@@ -167,7 +152,7 @@ func TestToolExecEndConsumesUnreportedTail(t *testing.T) {
 	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
 	// No update arrived — fullText carries everything.
 	r.ToolExecEnd("t1", false, "line A\nline B\n")
-	got := stripANSI(buf.String())
+	got := testutil.StripANSI(buf.String())
 	if !strings.Contains(got, "│ line A\n") || !strings.Contains(got, "│ line B\n") {
 		t.Errorf("expected both lines emitted from end-only fullText, got %q", got)
 	}
@@ -311,7 +296,7 @@ func TestParallelToolsRenderSequentially(t *testing.T) {
 	r.ToolExecEnd("a", false, "hello\n")
 	r.ToolExecEnd("b", false, "world\n")
 
-	got := stripANSI(buf.String())
+	got := testutil.StripANSI(buf.String())
 	// First box: header A, hello, footer A. Second box: header B, world, footer B.
 	idxHeaderA := strings.Index(got, "echo hello")
 	idxHello := strings.Index(got, "│ hello")
@@ -338,12 +323,12 @@ func TestParallelToolEndsBeforeFirstFinishes(t *testing.T) {
 	r.ToolExecStart("b", "bash", map[string]any{"command": "quick"})
 	r.ToolExecEnd("b", false, "quick output\n")
 	// No B output should appear yet — A is still active.
-	mid := stripANSI(buf.String())
+	mid := testutil.StripANSI(buf.String())
 	if strings.Contains(mid, "│ quick output") {
 		t.Errorf("B output leaked while A still active:\n%s", mid)
 	}
 	r.ToolExecEnd("a", false, "")
-	got := stripANSI(buf.String())
+	got := testutil.StripANSI(buf.String())
 	if !strings.Contains(got, "│ quick output") {
 		t.Errorf("B output should appear after A closes:\n%s", got)
 	}
