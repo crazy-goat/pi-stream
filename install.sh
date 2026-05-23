@@ -55,11 +55,11 @@ BINARY_URL="https://github.com/${REPO}/releases/latest/download/${BINARY}-${PLAT
 CHECKSUM_URL="https://github.com/${REPO}/releases/latest/download/checksums.txt"
 
 echo "Downloading ${BINARY} for ${PLATFORM}..."
-curl -sSfL "${BINARY_URL}" -o "${TMPDIR}/${BINARY}"
-curl -sSfL "${CHECKSUM_URL}" -o "${TMPDIR}/checksums.txt"
+curl -sSfL --connect-timeout 10 --max-time 60 "${BINARY_URL}" -o "${TMPDIR}/${BINARY}"
+curl -sSfL --connect-timeout 10 --max-time 60 "${CHECKSUM_URL}" -o "${TMPDIR}/checksums.txt"
 
 echo "Verifying checksum..."
-grep "${BINARY}-${PLATFORM}" "${TMPDIR}/checksums.txt" | (cd "${TMPDIR}" && ${CHECKSUM_CMD} -c -) 2>/dev/null || {
+grep -E "^[a-f0-9]{64}[[:space:]]{2}${BINARY}-${PLATFORM}$" "${TMPDIR}/checksums.txt" | (cd "${TMPDIR}" && ${CHECKSUM_CMD} -c -) || {
     echo "Checksum verification failed! Downloaded binary may be corrupted or tampered with." >&2
     exit 1
 }
