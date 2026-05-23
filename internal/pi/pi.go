@@ -20,7 +20,11 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"sync"
 )
+
+// piBinary is the pi binary path. Override in tests.
+var piBinary = "pi" //nolint:gochecknoglobals
 
 // Buffer sizes for the stdout scanner. The initial buffer is small but the
 // scanner will grow it on demand up to scanBufferMax before failing.
@@ -75,6 +79,8 @@ type Process struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
 	stdout io.ReadCloser
+
+	stderrWg sync.WaitGroup
 }
 
 // Start launches `pi --mode rpc` with the given options, writes the prompt
@@ -82,7 +88,7 @@ type Process struct {
 // stderr from the subprocess is copied to stderrOut in a background
 // goroutine that exits when the subprocess closes its stderr.
 func Start(ctx context.Context, opts Options, prompt string, stderrOut io.Writer) (*Process, error) {
-	cmd := exec.CommandContext(ctx, "pi", BuildArgs(opts)...)
+	cmd := exec.CommandContext(ctx, piBinary, BuildArgs(opts)...)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -101,7 +107,10 @@ func Start(ctx context.Context, opts Options, prompt string, stderrOut io.Writer
 		return nil, fmt.Errorf("start pi: %w", err)
 	}
 
+	p := &Process{cmd: cmd, stdin: stdin, stdout: stdout}
+	p.stderrWg.Add(1)
 	go func() {
+		defer p.stderrWg.Done()
 		_, _ = io.Copy(stderrOut, stderrPipe)
 	}()
 
@@ -114,7 +123,7 @@ func Start(ctx context.Context, opts Options, prompt string, stderrOut io.Writer
 		return nil, fmt.Errorf("send prompt: %w", err)
 	}
 
-	return &Process{cmd: cmd, stdin: stdin, stdout: stdout}, nil
+	return p, nil
 }
 
 // Events returns two channels: one that emits each line of pi's stdout as a
@@ -151,7 +160,9 @@ func (p *Process) Events() (<-chan []byte, <-chan error) {
 // returned error combines both the stdin close error and the wait error
 // (e.g. non-zero exit) via errors.Join.
 func (p *Process) Close() error {
-	return errors.Join(p.stdin.Close(), p.cmd.Wait())
+	err := errors.Join(p.stdin.Close(), p.cmd.Wait())
+	p.stderrWg.Wait()
+	return err
 }
 
 // Kill terminates the subprocess immediately. It is safe to call after
