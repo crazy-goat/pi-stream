@@ -5,6 +5,8 @@
 // embedded fields are sparsely populated depending on the envelope Type.
 package event
 
+import "strings"
+
 // Envelope is the top-level JSON object produced by pi for every event.
 // Most fields are optional and only populated for the matching Type.
 type Envelope struct {
@@ -57,12 +59,15 @@ type ResultContent struct {
 // SummaryText concatenates all text content blocks into a single string.
 // Non-text blocks (if pi ever adds them) are ignored.
 func (r *Result) SummaryText() string {
-	if r == nil {
+	if r == nil || len(r.Content) == 0 {
 		return ""
 	}
-	var b []byte
-	for _, c := range r.Content {
-		b = append(b, c.Text...)
+	if len(r.Content) == 1 {
+		return r.Content[0].Text
 	}
-	return string(b)
+	var sb strings.Builder
+	for _, c := range r.Content {
+		sb.WriteString(c.Text)
+	}
+	return sb.String()
 }
