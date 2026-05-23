@@ -354,6 +354,47 @@ func TestParallelToolEndsBeforeFirstFinishes(t *testing.T) {
 	}
 }
 
+func TestQueueNilWhenDrained(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("a", "bash", event.Args{"command": "echo a"})
+	r.ToolExecStart("b", "bash", event.Args{"command": "echo b"})
+	r.ToolExecStart("c", "bash", event.Args{"command": "echo c"})
+	// End A — promotes B (ends), promotes C (ends), queue drains to nil.
+	r.ToolExecEnd("a", false, "a\n")
+	r.ToolExecEnd("b", false, "b\n")
+	r.ToolExecEnd("c", false, "c\n")
+	if r.queue != nil {
+		t.Errorf("queue should be nil when fully drained, got %v", r.queue)
+	}
+}
+
+func TestQueueNilWhenSingleToolEnds(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("a", "bash", event.Args{"command": "echo a"})
+	r.ToolExecEnd("a", false, "a\n")
+	if r.queue != nil {
+		t.Errorf("queue should be nil after single tool ends, got %v", r.queue)
+	}
+}
+
+func TestPromoteNextOnNilQueueIsSafe(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	r.ToolExecStart("a", "bash", event.Args{"command": "echo a"})
+	r.ToolExecEnd("a", false, "a\n")
+	// promoteNext already ran; calling on nil queue must not panic
+	r.promoteNext()
+	got := testutil.StripANSI(buf.String())
+	if !strings.Contains(got, "echo a") {
+		t.Errorf("expected tool output, got %q", got)
+	}
+}
+
 func TestFormatDuration(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

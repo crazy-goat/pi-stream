@@ -155,10 +155,12 @@ func (r *Renderer) ToolExecEnd(id string, isErr bool, fullText string) {
 // promoteNext pulls the next queued call into the live slot, emits its
 // header, replays any output it accumulated while queued, and — if it has
 // already ended — closes it immediately. Loops so that a chain of already-
-// finished calls all flush out at once.
+// finished calls all flush out at once. The queue backing array is released
+// once fully drained to prevent unbounded memory retention.
 func (r *Renderer) promoteNext() {
 	for len(r.queue) > 0 {
 		next := r.queue[0]
+		r.queue[0] = ""
 		r.queue = r.queue[1:]
 		box, ok := r.tools[next]
 		if !ok {
@@ -175,6 +177,7 @@ func (r *Renderer) promoteNext() {
 		}
 		return
 	}
+	r.queue = nil
 }
 
 func (r *Renderer) emitHeader(b *toolBox) {
