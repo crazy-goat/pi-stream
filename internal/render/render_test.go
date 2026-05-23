@@ -461,6 +461,24 @@ func TestQueueNotNilWhenPendingItemsExist(t *testing.T) {
 	}
 }
 
+func TestQueueSliceDoesNotRetainOldEntries(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	r := New(&buf)
+	n := 100
+	for i := range n {
+		id := fmt.Sprintf("tool_%d", i)
+		r.ToolExecStart(id, "bash", event.Args{"command": fmt.Sprintf("echo %d", i)})
+	}
+	for i := range n {
+		id := fmt.Sprintf("tool_%d", i)
+		r.ToolExecEnd(id, false, fmt.Sprintf("output %d\n", i))
+	}
+	if r.queue != nil {
+		t.Errorf("queue should be nil when fully drained, got len=%d cap=%d", len(r.queue), cap(r.queue))
+	}
+}
+
 func TestFormatDuration(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -629,6 +647,24 @@ func BenchmarkMarshalJSONUnencodable(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		_ = marshalJSON(args)
+	}
+}
+
+func BenchmarkManyQueuedTools(b *testing.B) {
+	b.ReportAllocs()
+	var buf bytes.Buffer
+	for range b.N {
+		buf.Reset()
+		r := New(&buf)
+		n := 1000
+		for i := range n {
+			id := fmt.Sprintf("tool_%d", i)
+			r.ToolExecStart(id, "bash", event.Args{"command": fmt.Sprintf("echo %d", i)})
+		}
+		for i := range n {
+			id := fmt.Sprintf("tool_%d", i)
+			r.ToolExecEnd(id, false, fmt.Sprintf("output %d\n", i))
+		}
 	}
 }
 
