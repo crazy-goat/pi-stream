@@ -2,6 +2,7 @@ package event
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -116,6 +117,50 @@ func TestResultSummaryTextMultipleBlocks(t *testing.T) {
 	r := &Result{Content: []ResultContent{{Text: "hello"}, {Text: " world"}, {Text: "!"}}}
 	if got := r.SummaryText(); got != "hello world!" {
 		t.Errorf("SummaryText = %q, want %q", got, "hello world!")
+	}
+}
+
+func BenchmarkSummaryTextSingle(b *testing.B) {
+	b.ReportAllocs()
+	r := &Result{Content: []ResultContent{{Text: "hello world, this is a single block of text"}}}
+	b.ResetTimer()
+	for range b.N {
+		_ = r.SummaryText()
+	}
+}
+
+func BenchmarkSummaryTextMany(b *testing.B) {
+	b.ReportAllocs()
+	content := make([]ResultContent, 100)
+	for i := range content {
+		content[i] = ResultContent{Text: "block of text with some content for testing purposes "}
+	}
+	r := &Result{Content: content}
+	b.ResetTimer()
+	for range b.N {
+		_ = r.SummaryText()
+	}
+}
+
+func BenchmarkSummaryTextLarge(b *testing.B) {
+	b.ReportAllocs()
+	large := make([]ResultContent, 10)
+	for i := range large {
+		large[i] = ResultContent{Text: strings.Repeat("x", 10000)}
+	}
+	r := &Result{Content: large}
+	b.ResetTimer()
+	for range b.N {
+		_ = r.SummaryText()
+	}
+}
+
+func BenchmarkSummaryTextNil(b *testing.B) {
+	b.ReportAllocs()
+	var r *Result
+	b.ResetTimer()
+	for range b.N {
+		_ = r.SummaryText()
 	}
 }
 
