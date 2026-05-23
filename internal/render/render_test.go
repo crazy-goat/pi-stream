@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crazy-goat/pi-stream/internal/event"
 	"github.com/crazy-goat/pi-stream/internal/testutil"
 )
 
@@ -56,7 +57,7 @@ func TestToolExecStartBash(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "echo hi"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "echo hi"})
 	got := buf.String()
 	if !strings.Contains(got, "┌─ ⚡ bash") {
 		t.Errorf("expected top-of-box header, got %q", got)
@@ -73,7 +74,7 @@ func TestToolExecStartNonBash(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "http", map[string]any{"url": "https://example.com"})
+	r.ToolExecStart("t1", "http", event.Args{"url": "https://example.com"})
 	got := buf.String()
 	if !strings.Contains(got, "┌─ ⚡ http") {
 		t.Errorf("expected top-of-box header, got %q", got)
@@ -101,7 +102,7 @@ func TestToolExecUpdateStreamsCompleteLinesOnly(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
 
 	r.ToolExecUpdate("t1", "line 1\nline ")
 	got := testutil.StripANSI(buf.String())
@@ -123,7 +124,7 @@ func TestToolExecUpdateIgnoresShrinkingSnapshot(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
 	r.ToolExecUpdate("t1", "a\nb\n")
 	beforeLen := buf.Len()
 	r.ToolExecUpdate("t1", "a\n") // shorter — pi shouldn't do this, but be safe
@@ -136,7 +137,7 @@ func TestToolExecEndFlushesBufferedPartialLine(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
 	r.ToolExecUpdate("t1", "trailing without newline")
 	r.ToolExecEnd("t1", false, "trailing without newline")
 	got := testutil.StripANSI(buf.String())
@@ -149,7 +150,7 @@ func TestToolExecEndConsumesUnreportedTail(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
 	// No update arrived — fullText carries everything.
 	r.ToolExecEnd("t1", false, "line A\nline B\n")
 	got := testutil.StripANSI(buf.String())
@@ -162,7 +163,7 @@ func TestToolExecEndSuccessClosesBoxWithGreenCheck(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
 	r.ToolExecEnd("t1", false, "")
 	got := buf.String()
 	if !strings.Contains(got, "└─") || !strings.Contains(got, "✓ bash") {
@@ -177,7 +178,7 @@ func TestToolExecEndErrorClosesBoxWithRedCross(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
 	r.ToolExecEnd("t1", true, "")
 	got := buf.String()
 	if !strings.Contains(got, "✗ bash") {
@@ -192,7 +193,7 @@ func TestToolExecEndIncludesLineCountWhenNonZero(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
 	r.ToolExecUpdate("t1", "a\nb\nc\n")
 	r.ToolExecEnd("t1", false, "a\nb\nc\n")
 	got := buf.String()
@@ -205,7 +206,7 @@ func TestToolExecFullCycleNoOutput(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "edit", map[string]any{"path": "/x"})
+	r.ToolExecStart("t1", "edit", event.Args{"path": "/x"})
 	r.ToolExecEnd("t1", false, "")
 	got := buf.String()
 	if !strings.Contains(got, "┌─ ⚡ edit") || !strings.Contains(got, "└─") {
@@ -220,7 +221,7 @@ func TestToolExecFullOutputNotTruncated(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	r := New(&buf)
-	r.ToolExecStart("t1", "bash", map[string]any{"command": "x"})
+	r.ToolExecStart("t1", "bash", event.Args{"command": "x"})
 	long := strings.Repeat("x", 500) + "\n"
 	r.ToolExecUpdate("t1", long)
 	r.ToolExecEnd("t1", false, long)
@@ -235,7 +236,7 @@ func TestToolExecFullOutputNotTruncated(t *testing.T) {
 
 func TestMarshalJSONNoHTMLEscape(t *testing.T) {
 	t.Parallel()
-	got := marshalJSON(map[string]any{"cmd": "a && b <c>"})
+	got := marshalJSON(event.Args{"cmd": "a && b <c>"})
 	for _, want := range []string{"&&", "<c>"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("expected raw %q in %q", want, got)
@@ -253,7 +254,7 @@ func TestMarshalJSONNil(t *testing.T) {
 
 func TestMarshalJSONUnencodableValue(t *testing.T) {
 	t.Parallel()
-	got := marshalJSON(map[string]any{"ch": make(chan int)})
+	got := marshalJSON(event.Args{"ch": make(chan int)})
 	if got == "" || strings.Contains(got, "null") {
 		t.Errorf("marshalJSON with unencodable value should return fallback, got %q", got)
 	}
@@ -308,8 +309,8 @@ func TestParallelToolsRenderSequentially(t *testing.T) {
 	var buf bytes.Buffer
 	r := New(&buf)
 	// Two parallel tools: starts arrive before the first end.
-	r.ToolExecStart("a", "bash", map[string]any{"command": "echo hello"})
-	r.ToolExecStart("b", "bash", map[string]any{"command": "echo world"})
+	r.ToolExecStart("a", "bash", event.Args{"command": "echo hello"})
+	r.ToolExecStart("b", "bash", event.Args{"command": "echo world"})
 	r.ToolExecUpdate("a", "hello\n")
 	r.ToolExecUpdate("b", "world\n")
 	r.ToolExecEnd("a", false, "hello\n")
@@ -338,8 +339,8 @@ func TestParallelToolEndsBeforeFirstFinishes(t *testing.T) {
 	r := New(&buf)
 	// B starts and ends while A is still active. B's box must be flushed
 	// after A's, with its full content.
-	r.ToolExecStart("a", "bash", map[string]any{"command": "long-running"})
-	r.ToolExecStart("b", "bash", map[string]any{"command": "quick"})
+	r.ToolExecStart("a", "bash", event.Args{"command": "long-running"})
+	r.ToolExecStart("b", "bash", event.Args{"command": "quick"})
 	r.ToolExecEnd("b", false, "quick output\n")
 	// No B output should appear yet — A is still active.
 	mid := testutil.StripANSI(buf.String())

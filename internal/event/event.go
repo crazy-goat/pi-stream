@@ -7,6 +7,17 @@ package event
 
 import "strings"
 
+// Args represents tool arguments as a JSON object whose keys vary by tool
+// type (e.g. bash has "command", http has "url"). Use accessor methods
+// instead of raw map lookups with type assertions.
+type Args map[string]any
+
+// Command returns the value of the "command" key, which bash tools populate.
+func (a Args) Command() (string, bool) {
+	s, ok := a["command"].(string)
+	return s, ok
+}
+
 // Envelope is the top-level JSON object produced by pi for every event.
 // Most fields are optional and only populated for the matching Type.
 type Envelope struct {
@@ -20,12 +31,12 @@ type Envelope struct {
 	AssistantMessageEvent *AssistantMessageEvent `json:"assistantMessageEvent,omitempty"`
 
 	// Populated for type=="tool_execution_*".
-	ToolCallID    string         `json:"toolCallId,omitempty"`
-	ToolName      string         `json:"toolName,omitempty"`
-	Args          map[string]any `json:"args,omitempty"`
-	IsError       bool           `json:"isError,omitempty"`
-	Result        *Result        `json:"result,omitempty"`
-	PartialResult *Result        `json:"partialResult,omitempty"`
+	ToolCallID    string  `json:"toolCallId,omitempty"`
+	ToolName      string  `json:"toolName,omitempty"`
+	Args          Args    `json:"args,omitempty"`
+	IsError       bool    `json:"isError,omitempty"`
+	Result        *Result `json:"result,omitempty"`
+	PartialResult *Result `json:"partialResult,omitempty"`
 }
 
 // AssistantMessageEvent describes a single token-level event emitted by the
@@ -40,9 +51,9 @@ type AssistantMessageEvent struct {
 // ToolCall represents a tool invocation the model has decided to make.
 // Arguments are only present once the call is complete (toolcall_end).
 type ToolCall struct {
-	ID        string         `json:"id,omitempty"`
-	Name      string         `json:"name,omitempty"`
-	Arguments map[string]any `json:"arguments,omitempty"`
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Arguments Args   `json:"arguments,omitempty"`
 }
 
 // Result wraps the response returned by a tool execution.

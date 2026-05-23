@@ -77,7 +77,7 @@ func TestHandleEventToolExecEndRenders(t *testing.T) {
 		Type:       "tool_execution_start",
 		ToolCallID: "call-1",
 		ToolName:   "bash",
-		Args:       map[string]any{"command": "x"},
+		Args:       event.Args{"command": "x"},
 	}, &bytes.Buffer{})
 	_, _ = handleEvent(r, event.Envelope{
 		Type:       "tool_execution_end",
@@ -101,7 +101,7 @@ func TestHandleEventToolExecUpdateStreamsLines(t *testing.T) {
 	t.Parallel()
 	var out bytes.Buffer
 	r := render.New(&out)
-	r.ToolExecStart("call-1", "bash", map[string]any{"command": "seq 1 2"})
+	r.ToolExecStart("call-1", "bash", event.Args{"command": "seq 1 2"})
 	_, _ = handleEvent(r, event.Envelope{
 		Type:       "tool_execution_update",
 		ToolCallID: "call-1",
@@ -170,7 +170,7 @@ func TestHandleMessageToolCallEndIsNoOp(t *testing.T) {
 	r := render.New(&out)
 	handleMessage(r, &event.AssistantMessageEvent{
 		Type:     "toolcall_end",
-		ToolCall: &event.ToolCall{Name: "bash", Arguments: map[string]any{"command": "ls"}},
+		ToolCall: &event.ToolCall{Name: "bash", Arguments: event.Args{"command": "ls"}},
 	})
 	if out.String() != "" {
 		t.Errorf("toolcall_end should not render — box comes from tool_execution_*; got %q", out.String())

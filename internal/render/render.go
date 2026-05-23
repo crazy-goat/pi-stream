@@ -13,6 +13,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/crazy-goat/pi-stream/internal/event"
 )
 
 // State describes which kind of content the renderer most recently emitted.
@@ -33,7 +35,7 @@ const (
 type toolBox struct {
 	id            string
 	name          string
-	args          map[string]any
+	args          event.Args
 	startTime     time.Time
 	snapshot      string // latest cumulative stdout from updates / end
 	bytesEmitted  int    // bytes of snapshot already turned into output
@@ -96,7 +98,7 @@ func (r *Renderer) Text(delta string) {
 // streaming, its box header is emitted immediately and live updates will
 // flow into it. Otherwise the call is queued; its header (and accumulated
 // output) is emitted once the active box closes.
-func (r *Renderer) ToolExecStart(id, name string, args map[string]any) {
+func (r *Renderer) ToolExecStart(id, name string, args event.Args) {
 	box := &toolBox{
 		id:        id,
 		name:      name,
@@ -177,7 +179,7 @@ func (r *Renderer) promoteNext() {
 
 func (r *Renderer) emitHeader(b *toolBox) {
 	r.ensureNewline()
-	if cmd, ok := b.args["command"].(string); ok {
+	if cmd, ok := b.args.Command(); ok {
 		r.printf("%s┌─ ⚡ %s ─%s %s\n", ansiBoldCyan, b.name, ansiReset, cmd)
 	} else if len(b.args) > 0 {
 		r.printf("%s┌─ ⚡ %s%s %s\n", ansiBoldCyan, b.name, ansiReset, marshalJSON(b.args))
